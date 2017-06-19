@@ -1,5 +1,6 @@
 # -*- coding: latin-1 -*-
 
+# we are taking only lowercases and uppercases, no special characters
 dictionary = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 textToEncrypt = "La frequence des lettres dans un texte differe de celle de la liste des mots."
 
@@ -32,7 +33,10 @@ def rotateMessageWithShift(message, shift) :
     decryptedMessage = ""
     for i, value in enumerate(message) :
         if dictionary.find(value) != -1 :
-            decryptedMessage += dictionary[(dictionary.find(value)+len(dictionary)-shift)%len(dictionary)]
+            valueIndexInDict = dictionary.find(value)
+            newValueIndexInDict = valueIndexInDict+len(dictionary)+shift
+            newValueIndexInDictSimplified = newValueIndexInDict%len(dictionary)
+            decryptedMessage += str(dictionary[newValueIndexInDictSimplified])
         else :
             decryptedMessage += message[i]
     return decryptedMessage
@@ -43,8 +47,10 @@ def rotateMessageWithShift(message, shift) :
 # MAIN
 #####################
 
-print("message d'origine : " + textToEncrypt)
-encryptedMessage = rotateMessageWithShift(textToEncrypt, 10)
+
+userInput = raw_input("enter a message to encrypt : ")
+userShift = raw_input("enter a number for the rotation (must be an integer) : ")
+encryptedMessage = rotateMessageWithShift(userInput, int(userShift))
 print("message chiffré : " + encryptedMessage)
 print("shift = " + str(getShift(encryptedMessage)))
-print("message déchiffré : " + rotateMessageWithShift(encryptedMessage, getShift(encryptedMessage)))
+print("message déchiffré : " + rotateMessageWithShift(encryptedMessage, -getShift(encryptedMessage)))
