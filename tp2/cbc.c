@@ -19,10 +19,6 @@ void printCharInBits(char input) {
     }
 }
 
-char encryptDecryptChar(char input) {
-	return input ^ key[0];
-}
-
 
 int main() {
   printf("##########################\n");
@@ -32,11 +28,12 @@ int main() {
 
   // printf("Enter a password to encrypt your file :\n");
   // scanf("%s", &key);
-  char input = 'a';
 
   FILE *test;
-  test = fopen("encryptedTest.txt", "rb");
-  FILE *encryptedTest = fopen("encryptedTest2.bmp", "wb");
+  test = fopen("test.txt", "rb");
+  FILE *encryptedTest = fopen("test2.bmp", "wb");/*
+  test = fopen("test.bmp", "rb");
+  FILE *encryptedTest = fopen("test.txt", "wb");*/
   if(test==NULL) {
     printf("NOTHING IN FILE\n");
   } else {
@@ -48,9 +45,8 @@ int main() {
     while((car = fgetc(test)) != EOF)
     {
       char in = car;
-      fputc(encryptDecryptChar(in), encryptedTest);
-        printf("%d\n", i);
-        i++;
+      fputc(in ^ key[i % sizeof(key)], encryptedTest);
+      i++;
     }
   }
 
