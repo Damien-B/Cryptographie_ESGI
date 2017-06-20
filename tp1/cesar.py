@@ -2,7 +2,7 @@
 
 # we are taking only lowercases and uppercases, no special characters
 dictionary = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-textToEncrypt = "La frequence des lettres dans un texte differe de celle de la liste des mots."
+testMessage = "La frequence des lettres dans un texte differe de celle de la liste des mots."
 
 from collections import Counter
 
