@@ -6,21 +6,36 @@
 #define ITERATIONS 3
 #define MASKLENGTH 8
 
-unsigned char key[] = "password";
+char key[] = "passwordazfaefefezfze";
 
 // test function, not used
-void printCharInBits(char input) {
-  printf("PRINTING (in bits) : %c\n", input);
+// void printCharInBits(char input) {
+//   printf("PRINTING (in bits) : %c\n", input);
+//   int i;
+//   for(i=0;i<8;i++){
+//       printf("%d", (input & (1 << i)) >> i);
+//       if(i==7) {
+//         printf("\n");
+//       }
+//    }
+// }
+
+void encryptDecryptWithXOR(char *input, char *output, char *key) {
+
   int i;
-  for(i=0;i<8;i++){
-      printf("%d", (input & (1 << i)) >> i);
-      if(i==7) {
-        printf("\n");
-      }
-    }
+  for(i=0;i<strlen(input);i++) {
+    // printf("okokok %d\n", i);
+    output[i] = input[i] ^ key[i];
+    // printf("KOKO %c\n", input[i] ^ key[i]);
+    // printf("KOKO %c\n", output[i]);
+  }
+  printf("input : %s\n", input);
+  printf("output : %s\n", output);
+  printf("key : %s\n", key);
+  // return;
 }
 
-void encryptWithXOR(char *inputFileName, char *outputFileName) {
+void encrypt(char *inputFileName, char *outputFileName) {
   FILE *inputFile;
   inputFile = fopen(inputFileName, "rb");
   FILE *outputFile = fopen(outputFileName, "wb");
@@ -28,21 +43,53 @@ void encryptWithXOR(char *inputFileName, char *outputFileName) {
   if(inputFile==NULL) {
     printf("NOTHING IN FILE\n");
   } else {
-    printf("FILE LOADED\n");
+    printf("FILE %s LOADED\n", inputFileName);
 
-    int currentByte;
+    int currentChar;
+    char currentBytes[strlen(key)];
+    char digestedBytes[strlen(key)];
+    // printf("digestedBytes : %lu\n", strlen(digestedBytes));
     int i = 0;
-    char digest;
-    while((currentByte = fgetc(inputFile)) != EOF)
+    int j = 0;
+    while(1)
     {
-      char byte = currentByte;
-      if(i==0) {// if first iteration take the key to make a xor
-        // encrypt this byte with the corresponding password character
-        digest = byte ^ key[i % (sizeof(key)-1)];
-      } else {// for all the other iterations take the previous result to make a xor
-        digest = byte ^ digest;
+      currentChar = fgetc(inputFile);
+      if(currentChar == EOF) {
+        // encrypt the bytes & put it in the output file
+        char encryptedBytes[strlen(key)];
+        encryptDecryptWithXOR(currentBytes, encryptedBytes, digestedBytes);
+        fputs(encryptedBytes, outputFile);
+        break;
       }
-      fputc(digest, outputFile);
+      // check if our stocked bytes are the same size as the key
+      if(i>=strlen(key)) {
+        // printf("i = %d\n", i);
+        // reinitialize the counter
+        i = 0;
+        // encrypt the bytes
+        char encryptedBytes[strlen(key)];
+        // printf("strlenkey : %lu\n", strlen(key));
+        // printf("currentBytes : %lu\n", strlen(currentBytes));
+        // printf("encryptedBytes : %lu\n", strlen(encryptedBytes));
+        if(j==0) {// encrypt with the key
+          encryptDecryptWithXOR(currentBytes, encryptedBytes, key);
+        } else {
+          encryptDecryptWithXOR(currentBytes, encryptedBytes, digestedBytes);
+        }
+
+        // put the encrypted bytes in the output file
+        fputs(encryptedBytes, outputFile);
+        // use the encrypted bytes as digested bytes for the next iterative encryption
+        memcpy(digestedBytes, encryptedBytes, strlen(key));
+        // printf("digestedBytes : %lu\n", strlen(digestedBytes));
+        // printf("encryptedBytes : %lu\n", strlen(encryptedBytes));
+        // printf("key : %lu\n", strlen(key));
+        j++;
+      }
+
+      char byte = currentChar;
+      // printf("byte added : %c\n", byte);
+      currentBytes[i] = byte;
       i++;
     }
   }
@@ -51,32 +98,53 @@ void encryptWithXOR(char *inputFileName, char *outputFileName) {
   fclose(outputFile);
 }
 
-void decryptWithXOR(char *inputFileName, char *outputFileName) {
-  FILE *inputFile = fopen(inputFileName, "rb");
+void decrypt(char *inputFileName, char *outputFileName) {
+  FILE *inputFile;
+  inputFile = fopen(inputFileName, "rb");
   FILE *outputFile = fopen(outputFileName, "wb");
 
   if(inputFile==NULL) {
     printf("NOTHING IN FILE\n");
   } else {
-    printf("FILE LOADED\n");
+    printf("FILE %s LOADED\n", inputFileName);
 
-    int currentByte;
+    int currentChar;
+    char currentBytes[strlen(key)];
+    char digestedBytes[strlen(key)];
+    char previousBytes[strlen(key)];
     int i = 0;
-    char previousByte;
-    char digest;
-    while((currentByte = fgetc(inputFile)) != EOF)
+    int j = 0;
+
+    while(1)
     {
-      char byte = currentByte;
-      if(i==0) {// if first iteration take the key to make a xor
-        // encrypt this byte with the corresponding password character
-        digest = byte ^ key[i % (sizeof(key)-1)];
-      } else {// for all the other iterations take the previous result to make a xor
-        digest = byte ^ previousByte;
+      currentChar = fgetc(inputFile);
+      if(currentChar == EOF) {
+        // decrypt the bytes & put it in the output file
+        char encryptedBytes[strlen(key)];
+        encryptDecryptWithXOR(currentBytes, encryptedBytes, previousBytes);
+        fputs(encryptedBytes, outputFile);
+        break;
       }
-      // write the decrypted byte in our output file
-      fputc(digest, outputFile);
-      // set the current byte as previousByte for the next iteration
-      previousByte = byte;
+      char byte = currentChar;
+      // check if our stocked bytes are the same size as the key
+      if(i>=strlen(key)) {
+        // reinitialize the counter
+        i = 0;
+        // decrypt the bytes
+        char encryptedBytes[strlen(key)];
+        if(j==0) {// encrypt with the key
+          encryptDecryptWithXOR(currentBytes, encryptedBytes, key);
+        } else {
+          encryptDecryptWithXOR(currentBytes, encryptedBytes, previousBytes);
+        }
+        // put the decrypted bytes in the output file
+        fputs(encryptedBytes, outputFile);
+        // use the current encrypted bytes as previous bytes for the next iterative decryption
+        memcpy(previousBytes, currentBytes, strlen(key));
+        j++;
+      }
+
+      currentBytes[i] = byte;
       i++;
     }
   }
@@ -93,16 +161,16 @@ int main() {
   char userInputFileName[100];
   char userOutputFileName[100];
 
-  printf("Enter the name of the file you want to encrypt (with the extension) :\n");
-  scanf("%s", userInputFileName);
-  printf("Enter the name of the file you want to encrypt (with the extension) :\n");
-  scanf("%s", userOutputFileName);
+  // printf("Enter the name of the file you want to encrypt (with the extension) :\n");
+  // scanf("%s", userInputFileName);
+  // printf("Enter the name of the file you want to encrypt (with the extension) :\n");
+  // scanf("%s", userOutputFileName);
 
   // printf("Enter a password to encrypt your file :\n");
   // scanf("%s", &key);
 
-  encryptWithXOR(userInputFileName, "encrypted/encryptedFile.txt");
-  decryptWithXOR("encrypted/encryptedFile.txt", userOutputFileName);
+  encrypt("test.txt", "encrypted/encryptedFile.txt");
+  decrypt("encrypted/encryptedFile.txt", "test2.txt");
 
 
   printf("##########################\n");
