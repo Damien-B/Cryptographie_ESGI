@@ -68,7 +68,6 @@ void encrypt(char *inputFileName, char *outputFileName, char *userKey) {
         encryptDecryptWithXOR(encryptedBytes, encryptedBytes, key, endOfFilePadding);
       }
       // write the bytes in the output file
-      // fputs(encryptedBytes, outputFile);
       if(endOfFilePadding != 0) {
         fwrite(encryptedBytes, 1, endOfFilePadding, outputFile);
       } else {
@@ -146,7 +145,6 @@ void decrypt(char *inputFileName, char *outputFileName, char *userKey) {
         encryptDecryptWithXOR(decryptedBytes, decryptedBytes, previousBytes, endOfFilePadding);
       }
       // write the bytes in the output file
-      // fputs(decryptedBytes, outputFile);
       if(endOfFilePadding != 0) {
         fwrite(decryptedBytes, 1, endOfFilePadding, outputFile);
       } else {
@@ -172,48 +170,114 @@ void decrypt(char *inputFileName, char *outputFileName, char *userKey) {
 }
 
 
+
+void test() {
+  // open the files
+  FILE *inputFile = fopen("test.bmp", "rb");
+  FILE *outputFile = fopen("testOutput.bmp", "wb");
+
+  if(inputFile != NULL) {
+    printf("• FILE LOADED\n");
+
+    int currentChar;
+    int bufferCounter;
+    int iterations = 0;
+    char *currentBytes = malloc(4);
+    int notEndOfFile = 1;
+    int endOfFilePadding = 0;
+
+    while(notEndOfFile) {
+      // creating a buffer of bytes
+      for(bufferCounter=0;bufferCounter<4;bufferCounter++) {
+        if(bufferCounter==4) {
+            currentBytes[bufferCounter] = 'a';
+        } else {
+          // test if we are on the end of file
+          if((currentChar = fgetc(inputFile)) != EOF) {
+            // add the current read byte to the buffer
+            currentBytes[bufferCounter] = currentChar;
+
+          } else {// get out of the while loop
+            endOfFilePadding = bufferCounter;
+            notEndOfFile = 0;
+            break;
+          }
+        }
+      }
+      printf("currentBytes : '%s'\n", currentBytes);
+
+      printf("currentBytes : '%s'\n", currentBytes);
+
+      iterations++;
+
+      if(endOfFilePadding != 0) {
+        fwrite(currentBytes, 1, endOfFilePadding, outputFile);
+          fwrite("azertyuiop", 1, 10, outputFile);
+      } else {
+        fwrite(currentBytes, 1, 4, outputFile);
+      }
+    }
+    // free allocated memory (previous malloc)
+    free(currentBytes);
+  }
+
+  // close the files
+  fclose(inputFile);
+  fclose(outputFile);
+}
+
+
+
+
+
+
+
 int main() {
   printf("##########################\n");
   printf("PROGRAM START\n");
   printf("##########################\n\n");
 
-  char userInputFileName[256];
-  char userOutputFileName[256];
-  char userKey[] = "";
-  char type;
 
-  // user choose if he wants to encrypt, decrypt, or test the program
-  while(type != 'e' && type != 'd' && type != 'a') {
-    printf("Do you want to encrypt (type e) or decrypt (type d) a file ? (type a to launch in automatic mode, for test purpose)\n");
-    scanf("%c", &type);
-    printf("\n");
-  }
-  if(type == 'a') {
-    // launch with test files
-    encrypt("test.txt", "testEncrypted.txt", "randomPass");
-    decrypt("testEncrypted.txt", "testDecrypted.txt", "randomPass");
-    encrypt("test.bmp", "testEncrypted.bmp", "randomPass");
-    decrypt("testEncrypted.bmp", "testDecrypted.bmp", "randomPass");
-    encrypt("test.jpeg", "testEncrypted.jpeg", "randomPass");
-    decrypt("testEncrypted.jpeg", "testDecrypted.jpeg", "randomPass");
-  } else {
-    // user give the name of the input file
-    printf("Enter the name of the file you want to %s (with the extension) :\n", type=='e'?"encrypt":"decrypt");
-    scanf("%s", userInputFileName);
-    // user give the name of the output file
-    printf("Enter the name of the file you want to generate (with the extension) :\n");
-    scanf("%s", userOutputFileName);
-    // user give the password
-    printf("Enter a password to %s your file :\n", type=='e'?"encrypt":"decrypt");
-    scanf("%s", userKey);
-    printf("\n");
+  test();
 
-    if(type == 'e') {
-      encrypt(userInputFileName, userOutputFileName, userKey);
-    } else if(type == 'd') {
-      decrypt(userInputFileName, userOutputFileName, userKey);
-    }
-  }
+
+
+
+  // char userInputFileName[256];
+  // char userOutputFileName[256];
+  // char userKey[] = "";
+  // char type;
+  //
+  // // user choose if he wants to encrypt, decrypt, or test the program
+  // while(type != 'e' && type != 'd' && type != 'a') {
+  //   printf("Do you want to encrypt (type e) or decrypt (type d) a file ? (type a to launch in automatic mode, for test purpose)\n");
+  //   scanf("%c", &type);
+  //   printf("\n");
+  // }
+  // if(type == 'a') {
+  //   // launch with test files
+  //   encrypt("test.txt", "testEncrypted.txt", "randomPass");
+  //   decrypt("testEncrypted.txt", "testDecrypted.txt", "randomPass");
+  //   encrypt("test.bmp", "testEncrypted.bmp", "randomPass");
+  //   decrypt("testEncrypted.bmp", "testDecrypted.bmp", "randomPass");
+  // } else {
+  //   // user give the name of the input file
+  //   printf("Enter the name of the file you want to %s (with the extension) :\n", type=='e'?"encrypt":"decrypt");
+  //   scanf("%s", userInputFileName);
+  //   // user give the name of the output file
+  //   printf("Enter the name of the file you want to generate (with the extension) :\n");
+  //   scanf("%s", userOutputFileName);
+  //   // user give the password
+  //   printf("Enter a password to %s your file :\n", type=='e'?"encrypt":"decrypt");
+  //   scanf("%s", userKey);
+  //   printf("\n");
+  //
+  //   if(type == 'e') {
+  //     encrypt(userInputFileName, userOutputFileName, userKey);
+  //   } else if(type == 'd') {
+  //     decrypt(userInputFileName, userOutputFileName, userKey);
+  //   }
+  // }
 
   printf("\n##########################\n");
   printf("PROGRAM END\n");
