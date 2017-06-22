@@ -1,15 +1,11 @@
 /*
 Program created by Damien Bannerot
-
-Comments :
-- XOR is not working on char type when the two characters are the same (return 0) which create problems. Not resolved yet.
+5 MOC ESGI
 */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-
 
 // function used to encrypt an array of char with a key
 void encryptDecryptWithXOR(char *input, char *output, char *keyToEncrypt, int length) {
@@ -75,7 +71,12 @@ void encrypt(char *inputFileName, char *outputFileName, char *userKey) {
         encryptDecryptWithXOR(encryptedBytes, encryptedBytes, key, endOfFilePadding);
       }
       // write the bytes in the output file
-      fputs(encryptedBytes, outputFile);
+      // fputs(encryptedBytes, outputFile);
+      if(endOfFilePadding != 0) {
+        fwrite(encryptedBytes, 1, endOfFilePadding, outputFile);
+      } else {
+        fwrite(encryptedBytes, 1, strlen(userKey), outputFile);
+      }
       // set previous encrypted bytes to use for the next iteration
       memcpy(previousDigestedBytes, encryptedBytes, strlen(userKey));
 
@@ -144,7 +145,12 @@ void decrypt(char *inputFileName, char *outputFileName, char *userKey) {
         encryptDecryptWithXOR(decryptedBytes, decryptedBytes, previousBytes, endOfFilePadding);
       }
       // write the bytes in the output file
-      fputs(decryptedBytes, outputFile);
+      // fputs(decryptedBytes, outputFile);
+      if(endOfFilePadding != 0) {
+        fwrite(decryptedBytes, 1, endOfFilePadding, outputFile);
+      } else {
+        fwrite(decryptedBytes, 1, strlen(userKey), outputFile);
+      }
       // set previous bytes to use for the next iteration
       memcpy(previousBytes, currentBytes, strlen(userKey));
 
@@ -178,8 +184,10 @@ int main() {
   }
   if(type == 'a') {
     // launch with test files
-    encrypt("test.txt", "testEncrypted.txt", "PASS");
-    decrypt("testEncrypted.txt", "testDecrypted.txt", "PASS");
+    encrypt("test.txt", "testEncrypted.txt", "randomPass");
+    decrypt("testEncrypted.txt", "testDecrypted.txt", "randomPass");
+    encrypt("test.bmp", "testEncrypted.bmp", "randomPass");
+    decrypt("testEncrypted.bmp", "testDecrypted.bmp", "randomPass");
   } else {
     // user give the name of the input file
     printf("Enter the name of the file you want to %s (with the extension) :\n", type=='e'?"encrypt":"decrypt");
