@@ -1,11 +1,9 @@
-/*
-Program created by Damien Bannerot
-5 MOC ESGI
-*/
-
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
 void printCharInBits(char input) {
   printf("PRINTING (in bits) : %c\n", input);
   int i;
@@ -15,7 +13,235 @@ void printCharInBits(char input) {
         printf("\n");
       }
    }
+ }
+
+/*
+    This methods crypts the buffer passed as parameter
+    with a xor on the last crypted block, then a xor on the key
+*/
+int xorBuffer(int length, char *destination, char *buffer, char *lastCryptedBlock, char *key, bool crypt) {
+    int i = 0;
+
+    // for(i = 0; i < length; i ++) {
+    //     if(!crypt) {
+    //         destination[i] = (char)(buffer[i] ^ key[i]);
+    //     }
+    // }
+
+    // printf(" After part 1 : %s\n", destination);
+
+    for(i = 0; i < length; i ++) {
+        // printf("i : %d", i);
+        /* CBC : Xor on last crypted block */
+        destination[i] = buffer[i] ^ lastCryptedBlock[i];
+    }
+
+    // for(i = 0; i < length; i ++) {
+    //     if(crypt) {
+    //         destination[i] = (char)(destination[i] ^ key[i]);
+    //     }
+    // }
+    return i;
 }
+
+int getFileNumberOfChars(char *filePath) {
+    FILE *source = fopen(filePath, "r");
+    if (source == NULL) {
+        printf("Error opening file!\n");
+        exit(1);
+    }
+
+    fseek(source, 0, SEEK_END);
+    int byteCount = ftell(source);
+    fclose(source);
+
+    return byteCount;
+}
+
+int dechiffre(char *cryptedBuffer, int cryptedBufferLength, char *decryptedFilePath, char *key) {
+
+    /* Get key length */
+    int len = (sizeof(char) * strlen(key));
+
+    /* Open the destination file in write mode */
+    FILE *fileWrite = fopen(decryptedFilePath, "wb");
+    if (fileWrite == NULL) {
+        printf("Error opening destination file!\n");
+        exit(1);
+    }
+
+    /* Store the last crypted block in this
+        We initialize this with our key to have an IV */
+    char *lastXoredBlock = malloc(sizeof(char) * len);
+    if(lastXoredBlock == NULL) {
+        printf("Allocation Error !\n");
+        exit(1);
+    }
+    memcpy(lastXoredBlock, key, len);
+
+    /* The read buffer */
+    char *buffer = malloc(sizeof(char) * len);
+    if(buffer == NULL) {
+        printf("Allocation Error !\n");
+        exit(1);
+    }
+
+    /* The decrypted read buffer */
+    char *decryptedBuffer = malloc(sizeof(char) * len);
+    if(decryptedBuffer == NULL) {
+        printf("Allocation Error !\n");
+        exit(1);
+    }
+
+    /* set all entries in buffer to NULL by default*/
+    memset(buffer, 0, len);
+    memset(decryptedBuffer, 0, len);
+
+    int count = 0;
+    int i = 0;
+    int padding = cryptedBufferLength % len;
+    int paddingFrom = padding > 0 ? cryptedBufferLength - padding : cryptedBufferLength;
+
+    // printf("Padding %d, from : %d", padding, paddingFrom);
+    memcpy(buffer, cryptedBuffer, len);
+    xorBuffer(len, decryptedBuffer, buffer, lastXoredBlock, key, false);
+    // printf("Decrypted bytes : %s\n", decryptedBuffer);
+
+    for(i = 0; i <= cryptedBufferLength; i++) {
+        // printf("Buffer %d => %c \n", i, cryptedBuffer[i]);
+        if(count < len - 1 && (i != cryptedBufferLength)) {
+            /* fill buffer */
+            buffer[count++] = cryptedBuffer[i];
+
+        } else {
+            printf("__________\n");
+
+            /* Buffer full, let's decrypt it */
+            int decryptedBytes = 0;
+            if(i != paddingFrom) {
+                decryptedBytes = xorBuffer(len, decryptedBuffer, buffer, lastXoredBlock, key, false);
+            } else {
+                decryptedBytes = xorBuffer(padding, decryptedBuffer, buffer, lastXoredBlock, key, false);
+            }
+
+            // printf("Decrypted %d bytes : %s\n", decryptedBytes, decryptedBuffer);
+            memcpy(lastXoredBlock, buffer, len);
+            fwrite(decryptedBuffer, sizeof(char), decryptedBytes, fileWrite);
+
+            /* Reset for next buffer */
+            count = 0;
+            memset(buffer, 0, len);
+            memset(decryptedBuffer, 0, len);
+        }
+    }
+
+
+
+    free(buffer);
+    free(decryptedBuffer);
+    free(lastXoredBlock);
+    fclose(fileWrite);
+
+    return 0;
+}
+
+/*
+    This method crypts or decrypts (depending on "crypt" bool)
+    the source file and write the result in destination file
+    using the key parameter, in CBC mode
+*/
+int chiffre(char *sourceFilePath, char *encryptedData, char *key, bool crypt) {
+
+    /* Open source file in read mode */
+    FILE *fileRead = fopen(sourceFilePath, "rb");
+    if (fileRead == NULL) {
+        printf("Error opening source file!\n");
+        exit(1);
+    }
+
+    int nbCharsInFile = getFileNumberOfChars(sourceFilePath);
+    char *cryptedBuffer = malloc(sizeof(char) * nbCharsInFile);
+    memset(cryptedBuffer, 0, nbCharsInFile);
+    int count = 0;
+
+    printf("Number of chars in file : %d \n", nbCharsInFile);
+
+    /* Get key length */
+    int len = (sizeof(char) * strlen(key));
+    printf("- Key length : %d \n", len);
+
+    /* Store the last crypted block in this
+        We initialize this with our key to have an IV */
+    char *lastXoredBlock = malloc(sizeof(char) * len);
+    if(lastXoredBlock == NULL) {
+        printf("Allocation Error !\n");
+        exit(1);
+    }
+    memcpy(lastXoredBlock, key, len);
+
+    /* The read buffer */
+    char *buffer = malloc(sizeof(char) * len);
+    size_t bytesRead = 0;
+
+    /* set all entries in buffer to NULL by default*/
+    memset(buffer, 0, len);
+
+    // printf("- %s content ...  \n", crypt ? "Crypting" : "Decrypting");
+
+    char *crypted = malloc(sizeof(char) * len);
+    if(crypted == NULL) {
+        printf("Allocation Error !\n");
+        exit(1);
+    }
+
+    /* Read file using buffer */
+    while ((bytesRead = fread(buffer, sizeof(char), len, fileRead)) > 0)
+    {
+        int cryptedBytes = xorBuffer((int)bytesRead, crypted, buffer, lastXoredBlock, key, crypt);
+        //  printf(" decrypted : %s\n", decrypted);
+        // printf("Crypted => %s\n", crypted);
+
+        strncat(cryptedBuffer, crypted, bytesRead);
+        // printf("cryptedBufferContent %s \n", cryptedBuffer);
+        // int i = 0;
+        // for(i = 0; i < bytesRead; i++) {
+        //     /* We fill the globalBuffer with the crypted buffer */
+        //     cryptedBuffer[count++] = crypted[i];
+        // }
+        count+= bytesRead;
+
+        // Store last crypted block for next iteration
+        memcpy(lastXoredBlock, crypted, len);
+
+        memset(buffer, 0, bytesRead);
+        memset(crypted, 0, len);
+    }
+
+    /* Close our files */
+    fclose(fileRead);
+
+
+    memcpy(encryptedData, cryptedBuffer, len);
+    // FILE *writeInputFile = fopen("DATAENCRYPTED.txt", "wb");
+    // if(writeInputFile != NULL) {
+    //   fwrite(encryptedData, sizeof(char), nbCharsInFile, writeInputFile);
+    // }
+
+    // ---------------------TEST------------------------
+    // DONE Crypting buffer, let's decrypt it
+    // dechiffre(cryptedBuffer, count, destFilePath, key);
+    // ------------------- ENDTEST ---------------------
+
+    // Finally we free our allocations
+    free(lastXoredBlock);
+    free(buffer);
+    free(crypted);
+    free(cryptedBuffer);
+
+    return 0;
+}
+
+
 // // function used to encrypt an array of char with a key
 // void encryptDecryptWithXOR(char *input, char *output, char *keyToEncrypt, int length) {
 //   int i;
@@ -171,70 +397,207 @@ void printCharInBits(char input) {
 
 
 
-void test() {
-  // open the files
-  FILE *inputFile = fopen("test32.bmp", "rb");
-  FILE *outputFile = fopen("testOutput.bmp", "wb");
+void insertDataInBMPData(char *encryptedDataBuffer, char *bmpFileName, int sizeOfData) {
+    int bmpBytesCount = getFileNumberOfChars(bmpFileName);
 
-  if(inputFile != NULL) {
-    printf("• FILE LOADED\n");
+    // open the bmp file to read
+    FILE *inputFile = fopen(bmpFileName, "rb");
+    if(inputFile != NULL) {
 
-    int currentChar;
-    int bufferCounter;
-    int iterations = 0;
-    char *currentBytes = malloc(4);
-    int notEndOfFile = 1;
-    int endOfFilePadding = 0;
+      // get size of the bmp file in bytes
+      // fseek(inputFile, 0, SEEK_END);
+      // int bmpBytesCount = ftell(inputFile);
+      // fseek(inputFile, 0, SEEK_SET);
 
-    char *headerBytes = malloc(54);
-    fread(headerBytes, 1, 54, inputFile);
-    fwrite(headerBytes, 1, 54, outputFile);
-    fseek(inputFile, 54, SEEK_SET);
+      // create a copy of the bmp file
+      // char *bmpWithEncryptedDataBuffer;
+      // commented try to handle larger data than what we can handle in the 4th bytes
+      // if(sizeOfData>(bmpBytesCount-54)/4) {
+      //   printf("BIGGER");
+      //   bmpWithEncryptedDataBuffer = malloc(sizeof(char)*(bmpBytesCount+sizeOfData-(bmpBytesCount-54)/4));
+      // } else {
+        // bmpWithEncryptedDataBuffer = malloc(sizeof(char)*bmpBytesCount);
+      // }
+      char *bmpWithEncryptedDataBuffer = malloc(sizeof(char)*bmpBytesCount);
 
-    while(notEndOfFile) {
-      // creating a buffer of 4 bytes
-      for(bufferCounter=0;bufferCounter<4;bufferCounter++) {
-          // test if we are on the end of file
-          if((currentChar = fgetc(inputFile)) != EOF) {
-            if(bufferCounter==3) {
-              // insert data in the 4th byte //TODO
-              currentBytes[bufferCounter] = 'A';
-            } else {
-              // add the current read byte to the buffer
-              currentBytes[bufferCounter] = currentChar;
+      memcpy(bmpWithEncryptedDataBuffer, inputFile, bmpBytesCount);
+
+      int currentChar;
+      int bytesCounter;
+      int iterations = 0;
+      int notEndOfFile = 1;
+      int endOfFilePadding = 0;
+
+      // set header in the bmp buffer
+      char *headerBytes = malloc(54);
+      fread(headerBytes, 1, 54, inputFile);
+      int i;
+      for(i=0;i<54;i++) {
+        bmpWithEncryptedDataBuffer[i] = headerBytes[i];
+      }
+
+
+
+      // set read cursor just after header
+      fseek(inputFile, 54, SEEK_SET);
+
+      while(notEndOfFile) {
+        // creating a buffer of 4 bytes
+        for(bytesCounter=0;bytesCounter<4;bytesCounter++) {
+            if((currentChar = fgetc(inputFile)) != EOF) {// test if we are at the end of file
+              if(iterations==0) {
+                if(bytesCounter==3) {// reserved byte for encrypted bytes count (max 256)
+                  // printCharInBits(currentChar);
+                  bmpWithEncryptedDataBuffer[iterations*4+bytesCounter+54] = (unsigned char)sizeOfData;
+                } else {
+                  // add the current read byte to the buffer without changes
+                  bmpWithEncryptedDataBuffer[iterations*4+bytesCounter+54] = currentChar;
+                }
+              } else {
+                if(bytesCounter==3) {
+                  // printCharInBits(currentChar);
+                  // insert data in the 4th byte
+                  if(iterations<sizeOfData) {
+                    bmpWithEncryptedDataBuffer[iterations*4+bytesCounter+54] = encryptedDataBuffer[iterations];
+                  } else {
+                    // printf("CURRENTCHAR: %c\n", currentChar);
+                    bmpWithEncryptedDataBuffer[iterations*4+bytesCounter+54] = currentChar;
+                  }
+                } else {
+                  // add the current read byte to the buffer without changes
+                  bmpWithEncryptedDataBuffer[iterations*4+bytesCounter+54] = currentChar;
+                }
+              }
+
+            } else {// get out of the while loop
+              // bmpWithEncryptedDataBuffer[bmpBytesCount] = currentChar;
+              notEndOfFile = 0;
+              break;
             }
-
-          } else {// get out of the while loop
-            endOfFilePadding = bufferCounter;
-            notEndOfFile = 0;
-            break;
-          }
+        }
+        iterations++;
       }
-      // printf("currentBytes : '%s'\n", currentBytes);
+      // free allocated memory (previous malloc)
+      free(headerBytes);
+
+      // close read of the bmp
+      fclose(inputFile);
+
+      // commented try to handle larger data than what we can handle in the 4th bytes
+      // if(sizeOfData>(bmpBytesCount-54)/4) {
+      //   int k;
+      //   for(k=0;k<sizeOfData-(bmpBytesCount-54)/4;k++) {
+      //     bmpWithEncryptedDataBuffer[bmpBytesCount+k] = encryptedDataBuffer[(bmpBytesCount-54)/4+k];
+      //   }
+      // }
 
 
-      iterations++;
-
-      if(endOfFilePadding != 0) {
-        printf("••••• END OF FILE PADDING : %d\n", endOfFilePadding);
-        // currentBytes[2] = '\0';
-        // currentBytes[3] = '\0';
-        fwrite(currentBytes, 1, endOfFilePadding-1, outputFile);
-      } else {
-        fwrite(currentBytes, 1, 4, outputFile);
+      printf("AZRGOJRREOKJGZJFEJ : %s\n", bmpWithEncryptedDataBuffer);
+      FILE *writeInputFile = fopen("test32bOutput.bmp", "wb");
+      if(writeInputFile != NULL) {
+        fwrite(bmpWithEncryptedDataBuffer, sizeof(char), bmpBytesCount, writeInputFile);
+        // int j;
+        // for(j=0;j<bmpBytesCount;j++) {
+        //   printf("put char %c in 4th byte\n", bmpWithEncryptedDataBuffer[i]);
+        //   char currentChar[1];
+        //   memcpy(currentChar, &bmpWithEncryptedDataBuffer[i], 1);
+        //   fwrite(&currentChar, sizeof(char), 1, writeInputFile);
+        // }
       }
+      fclose(writeInputFile);
     }
-    // free allocated memory (previous malloc)
-    free(currentBytes);
-  }
-
-  // close the files
-  fclose(inputFile);
-  fclose(outputFile);
 }
 
+int getSizeOfHiddenFileInBMP(char *bmpFileName) {
+  FILE *inputFile = fopen(bmpFileName, "rb");
+  if(inputFile != NULL) {
+    char *size;
+    fread(size, sizeof(char), 1, inputFile);
+    int intSize = (unsigned int)size;
+    fclose(inputFile);
+    return intSize;
+  }
+  return 0;
+}
+
+void retrieveDataInBMPData(char *bmpFileName) {
+
+    int encryptedBytesSize = getSizeOfHiddenFileInBMP(bmpFileName);
+    // open the bmp file to read
+    FILE *inputFile = fopen(bmpFileName, "rb");
+    if(inputFile != NULL) {
+
+      // get size of the bmp file in bytes
+      fseek(inputFile, 0, SEEK_END);
+      int bmpBytesCount = ftell(inputFile);
+      fseek(inputFile, 0, SEEK_SET);
 
 
+
+
+      int currentChar;
+      int bytesCounter;
+      int iterations = 0;
+      int notEndOfFile = 1;
+      int endOfFilePadding = 0;
+
+      // set read cursor just after header
+      fseek(inputFile, 54, SEEK_SET);
+
+      char *encryptedDataBuffer = malloc(sizeof(char)*encryptedBytesSize);
+
+      while(notEndOfFile) {
+        // creating a buffer of 4 bytes
+        for(bytesCounter=0;bytesCounter<4;bytesCounter++) {
+            if((currentChar = fgetc(inputFile)) != EOF) {// test if we are at the end of file
+            printf("AEAERZTRZ\n");
+              if(iterations!=0) {
+                if(bytesCounter==3) {
+                  printCharInBits(currentChar);
+                  // insert data in the 4th byte
+                  if(iterations<encryptedBytesSize) {
+                    encryptedDataBuffer[iterations-1] = currentChar;
+                  } else {// get out of the while loop
+                    notEndOfFile = 0;
+                    break;
+                  }
+                }
+              }
+
+            } else {// get out of the while loop
+              notEndOfFile = 0;
+              break;
+            }
+        }
+        iterations++;
+      }
+
+      // close read of the bmp
+      fclose(inputFile);
+
+      // commented try to handle larger data than what we can handle in the 4th bytes
+      // if(sizeOfData>(bmpBytesCount-54)/4) {
+      //   int k;
+      //   for(k=0;k<sizeOfData-(bmpBytesCount-54)/4;k++) {
+      //     bmpWithEncryptedDataBuffer[bmpBytesCount+k] = encryptedDataBuffer[(bmpBytesCount-54)/4+k];
+      //   }
+      // }
+
+
+      FILE *writeInputFile = fopen("TEXTOUTPUT.txt", "wb");
+      if(writeInputFile != NULL) {
+        fwrite(encryptedDataBuffer, sizeof(char), encryptedBytesSize, writeInputFile);
+        // int j;
+        // for(j=0;j<bmpBytesCount;j++) {
+        //   printf("put char %c in 4th byte\n", bmpWithEncryptedDataBuffer[i]);
+        //   char currentChar[1];
+        //   memcpy(currentChar, bmpWithEncryptedDataBuffer[i], 1);
+        //   fwrite(currentChar, sizeof(char), 1, writeInputFile);
+        // }
+      }
+      free(encryptedDataBuffer);
+    }
+}
 
 
 
@@ -244,53 +607,16 @@ int main() {
   printf("PROGRAM START\n");
   printf("##########################\n\n");
 
+  char test[50] = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
 
-  test();
+  // bool crypt = true;
+  char *key = "password";
+  // char sourceFilePath[] = "test.txt";
+  // char *crypted = malloc(sizeof(char)*getFileNumberOfChars(sourceFilePath));
+  // chiffre(sourceFilePath, crypted, key, crypt);
 
-
-  FILE *inputFile = fopen("testOutput.bmp", "rb");
-
-  if(inputFile != NULL) {
-    printf("• FILE LOADED\n");
-
-    int currentChar;
-    int bufferCounter;
-    int iterations = 0;
-    char *currentBytes = malloc(4);
-    int notEndOfFile = 1;
-    int endOfFilePadding = 0;
-
-    fseek(inputFile, 54, SEEK_SET);
-    while(notEndOfFile) {
-      // creating a buffer of bytes
-      for(bufferCounter=0;bufferCounter<4;bufferCounter++) {
-
-          // test if we are on the end of file
-          if((currentChar = fgetc(inputFile)) != EOF) {
-            // add the current read byte to the buffer
-            currentBytes[bufferCounter] = currentChar;
-            // printCharInBits(currentChar);
-
-          } else {// get out of the while loop
-            endOfFilePadding = bufferCounter;
-            notEndOfFile = 0;
-            break;
-          }
-
-
-      }
-      printf("currentBytes (len = %lu): '%s'\n", strlen(currentBytes), currentBytes);
-
-
-      iterations++;
-
-    }
-    // free allocated memory (previous malloc)
-    free(currentBytes);
-  }
-
-  // close the files
-  fclose(inputFile);
+  insertDataInBMPData(test, "test32b.bmp", 50);
+  retrieveDataInBMPData("test32bOutput.bmp");
 
   // char userInputFileName[256];
   // char userOutputFileName[256];
