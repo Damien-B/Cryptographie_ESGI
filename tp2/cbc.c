@@ -9,13 +9,11 @@ Program created by Damien Bannerot
 
 // function used to encrypt an array of char with a key
 void encryptDecryptWithXOR(char *input, char *output, char *keyToEncrypt, int length) {
-  // printf("XOR input '%s' of length %lu\n", input, strlen(input));
-  // printf("XOR keyToEncrypt '%s' of length %lu\n", keyToEncrypt, strlen(keyToEncrypt));
   int i;
   for(i=0;i<length;i++) {
+    // do XOR with input and key for each byte
     output[i] = (char)(input[i] ^ keyToEncrypt[i]);
   }
-  printf("XOR output '%s' of length %lu\n", output, strlen(output));
 }
 
 // function used to encrypt a file
@@ -64,7 +62,6 @@ void encrypt(char *inputFileName, char *outputFileName, char *userKey) {
         // doing a XOR with the key
         encryptDecryptWithXOR(encryptedBytes, encryptedBytes, key, strlen(userKey));
       } else {// last bytes
-        printf("currentBytes : %s\n", currentBytes);
         // encrypt the end of the file (handling padding)
         encryptDecryptWithXOR(currentBytes, encryptedBytes, previousDigestedBytes, endOfFilePadding);
         // doing a XOR with the key
@@ -82,6 +79,11 @@ void encrypt(char *inputFileName, char *outputFileName, char *userKey) {
 
       iterations++;
     }
+    // free allocated memory (previous malloc)
+    free(key);
+    free(currentBytes);
+    free(encryptedBytes);
+    free(previousDigestedBytes);
   }
 
   // close the files
@@ -138,7 +140,6 @@ void decrypt(char *inputFileName, char *outputFileName, char *userKey) {
         // doing a XOR with the key
         encryptDecryptWithXOR(decryptedBytes, decryptedBytes, previousBytes, strlen(userKey));
       } else {// last bytes
-        printf("currentBytes : %s\n", currentBytes);
         // decrypt the end of the file (handling padding)
         encryptDecryptWithXOR(currentBytes, decryptedBytes, key, endOfFilePadding);
         // doing a XOR with the key
@@ -156,6 +157,11 @@ void decrypt(char *inputFileName, char *outputFileName, char *userKey) {
 
       iterations++;
     }
+    // free allocated memory (previous malloc)
+    free(key);
+    free(currentBytes);
+    free(decryptedBytes);
+    free(previousBytes);
   }
 
   // close the files
