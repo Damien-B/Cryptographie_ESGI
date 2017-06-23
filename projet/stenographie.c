@@ -106,7 +106,6 @@ void encryptData(char *inputFileName, char *output, char *userKey) {
       } else {
         int a;
         for(a=0;a<strlen(userKey);a++) {
-          printf("TESTTESTTEST\n");
           output[iterations*strlen(userKey)+a] = encryptedBytes[a];
         }
       }
@@ -229,6 +228,7 @@ void insertDataInBMPData(char *encryptedDataBuffer, char *bmpFileName) {
             if((currentChar = fgetc(inputFile)) != EOF) {// test if we are at the end of file
               if(iterations==0) {
                 if(bytesCounter==3) {// reserved byte for encrypted bytes count (max 256)
+                  printf("PUT SIZE IN BMP %c\n", (unsigned char)bmpBytesCount);
                   bmpWithEncryptedDataBuffer[iterations*4+bytesCounter+54] = (unsigned char)bmpBytesCount;
                 } else {
                   // add the current read byte to the buffer without changes
