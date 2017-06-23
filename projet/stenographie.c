@@ -38,7 +38,6 @@ void printCharInBits(char input) {
  }
 
 
-
 // function used to encrypt an array of char with a key
 void encryptDecryptWithXOR(char *input, char *output, char *keyToEncrypt, int length) {
   int i;
@@ -49,11 +48,10 @@ void encryptDecryptWithXOR(char *input, char *output, char *keyToEncrypt, int le
 }
 
 // function used to encrypt a file
-void encryptAZ(char *inputFileName, char *output, char *userKey) {
+void encryptData(char *inputFileName, char *output, char *userKey) {
   printf("• START ENCRYPTING\n");
   // opening files
   FILE *inputFile = fopen(inputFileName, "rb");
-  FILE *outputFile = fopen("ENCRYPTEDTEST.txt", "wb");
 
   if(inputFile != NULL) {
     printf("• FILE LOADED (%s)\n", inputFileName);
@@ -100,28 +98,19 @@ void encryptAZ(char *inputFileName, char *output, char *userKey) {
         encryptDecryptWithXOR(encryptedBytes, encryptedBytes, key, endOfFilePadding);
       }
       // write the bytes in the output file
-      // fputs(encryptedBytes, outputFile);
       if(endOfFilePadding != 0) {
-        fwrite(encryptedBytes, 1, endOfFilePadding, outputFile);
         int a;
         for(a=0;a<endOfFilePadding;a++) {
           output[iterations*endOfFilePadding+a] = encryptedBytes[a];
         }
-        // memcpy(output, encryptedBytes, endOfFilePadding);
       } else {
-        fwrite(encryptedBytes, 1, strlen(userKey), outputFile);
         int a;
         for(a=0;a<strlen(userKey);a++) {
           output[iterations*strlen(userKey)+a] = encryptedBytes[a];
         }
-        // memcpy(output, encryptedBytes, strlen(userKey));
       }
       // set previous encrypted bytes to use for the next iteration
       memcpy(previousDigestedBytes, encryptedBytes, strlen(userKey));
-            //
-            // FILE *out = fopen("azeazezae2.txt", "wb");
-            // fwrite(encry, 1, azeaze.size, out);
-            // fclose(out);
       iterations++;
     }
     // free allocated memory (previous malloc)
@@ -131,94 +120,73 @@ void encryptAZ(char *inputFileName, char *output, char *userKey) {
     free(previousDigestedBytes);
   }
 
-  // close the files
+  // close the file
   fclose(inputFile);
-  fclose(outputFile);
 
   printf("• ENCRYPTING FINISHED\n");
 }
 
 
 // function used to decrypt a file
-void decryptAZ(char *input, int inputSize, char *outputFileName, char *userKey) {
+void decryptData(char *input, int inputSize, char *outputFileName, char *userKey) {
   printf("• START DECRYPTING\n");
-  printf("DECRYPT INPUT : %s\n", input);
-  printf("DECRYPT INPUT SIZE : %d\n", inputSize);
-  printf("DECRYPT KEY LENGTH : %lu\n", strlen(userKey));
-  // opening files
-  // FILE *inputFile = fopen(inputFileName, "rb");
 
+  // opening file
   FILE *outputFile = fopen(outputFileName, "wb");
 
-  // if(inputFile != NULL) {
-    // printf("• FILE LOADED (%s)\n", inputFileName);
+  int currentChar;
 
-    int currentChar;
+  int bufferCounter;
+  int iterations = 0;
+  char *key = malloc(strlen(userKey));
+  strcpy(key, userKey);
+  char *currentBytes = malloc(strlen(userKey));
+  char *decryptedBytes = malloc(strlen(userKey));
+  char *previousBytes = malloc(strlen(userKey));
+  int notEndOfFile = 1;
+  int endOfFilePadding = 0;
 
-    int bufferCounter;
-    int iterations = 0;
-    char *key = malloc(strlen(userKey));
-    strcpy(key, userKey);
-    char *currentBytes = malloc(strlen(userKey));
-    char *decryptedBytes = malloc(strlen(userKey));
-    char *previousBytes = malloc(strlen(userKey));
-    int notEndOfFile = 1;
-    int endOfFilePadding = 0;
-
-    while(notEndOfFile) {
-      // creating a buffer of bytes
-      for(bufferCounter=0;bufferCounter<strlen(userKey);bufferCounter++) {
-        // test if we are on the end of file
-        if(iterations*strlen(userKey)+bufferCounter<inputSize) {
-          // add the current read byte to the buffer
-          printf("INPUT AT INDEX %lu : %c\n", iterations*strlen(userKey)+bufferCounter, input[iterations*strlen(userKey)+bufferCounter]);
-          currentBytes[bufferCounter] = (char)(unsigned int)input[iterations*strlen(userKey)+bufferCounter];
-        } else {// get out of the while loop
-          notEndOfFile = 0;
-          // set the endOfFilePadding to use as the size of the key to decrypt with a XOR
-          endOfFilePadding = bufferCounter;
-          break;
-        }
+  while(notEndOfFile) {
+    // creating a buffer of bytes
+    for(bufferCounter=0;bufferCounter<strlen(userKey);bufferCounter++) {
+      // test if we are on the end of file
+      if(iterations*strlen(userKey)+bufferCounter<inputSize) {
+        // add the current read byte to the buffer
+        currentBytes[bufferCounter] = (char)(unsigned int)input[iterations*strlen(userKey)+bufferCounter];
+      } else {// get out of the while loop
+        notEndOfFile = 0;
+        // set the endOfFilePadding to use as the size of the key to decrypt with a XOR
+        endOfFilePadding = bufferCounter;
+        break;
       }
-      printf("CURRENT BYTES TO DECRYPT : %s\n", currentBytes);
-      if(iterations == 0) {// first bytes
-        // first iteration : use the key as initialization vector
-        encryptDecryptWithXOR(currentBytes, decryptedBytes, key, strlen(userKey));
-        // doing a XOR with the key
-        encryptDecryptWithXOR(decryptedBytes, decryptedBytes, key, strlen(userKey));
-      } else if (notEndOfFile == 1) {
-        // decrypt with the last encrypted bytes
-        encryptDecryptWithXOR(currentBytes, decryptedBytes, key, strlen(userKey));
-        // doing a XOR with the key
-        encryptDecryptWithXOR(decryptedBytes, decryptedBytes, previousBytes, strlen(userKey));
-      } else {// last bytes
-        // decrypt the end of the file (handling padding)
-        encryptDecryptWithXOR(currentBytes, decryptedBytes, key, endOfFilePadding);
-        // doing a XOR with the key
-        encryptDecryptWithXOR(decryptedBytes, decryptedBytes, previousBytes, endOfFilePadding);
-      }
-      printf("DECRYPTED BYTES BUFFER : %s\n", decryptedBytes);
-      // write the bytes in the output file
-      if(endOfFilePadding != 0) {
-        printf("endOfFilePadding : %d\n", endOfFilePadding);
-        fwrite(decryptedBytes, 1, endOfFilePadding, outputFile);
-      } else {
-        fwrite(decryptedBytes, 1, strlen(userKey), outputFile);
-      }
-      // set previous bytes to use for the next iteration
-      memcpy(previousBytes, currentBytes, strlen(userKey));
-
-      iterations++;
     }
-    // free allocated memory (previous malloc)
-    free(key);
-    free(currentBytes);
-    free(decryptedBytes);
-    free(previousBytes);
-  // }
+    if(iterations == 0) {// first bytes
+      // first iteration : use the key as initialization vector
+      encryptDecryptWithXOR(currentBytes, decryptedBytes, key, strlen(userKey));
+      // doing a XOR with the key
+      encryptDecryptWithXOR(decryptedBytes, decryptedBytes, key, strlen(userKey));
+    } else {
+      // decrypt with the last encrypted bytes
+      encryptDecryptWithXOR(currentBytes, decryptedBytes, key, notEndOfFile==1?strlen(userKey):endOfFilePadding);
+      // doing a XOR with the key
+      encryptDecryptWithXOR(decryptedBytes, decryptedBytes, previousBytes, notEndOfFile==1?strlen(userKey):endOfFilePadding);
+    }
 
-  // close the files
-  // fclose(inputFile);
+    // write the bytes in the output file
+    fwrite(decryptedBytes, 1, notEndOfFile==1?strlen(userKey):endOfFilePadding, outputFile);
+
+    // set previous bytes to use for the next iteration
+    memcpy(previousBytes, currentBytes, strlen(userKey));
+
+    iterations++;
+  }
+  // free allocated memory (previous malloc)
+  free(key);
+  free(currentBytes);
+  free(decryptedBytes);
+  free(previousBytes);
+
+  // close the file
   fclose(outputFile);
 
   printf("• DECRYPTING FINISHED\n");
@@ -232,20 +200,6 @@ void insertDataInBMPData(char *encryptedDataBuffer, char *bmpFileName, int sizeO
     FILE *inputFile = fopen(bmpFileName, "rb");
     if(inputFile != NULL) {
 
-      // get size of the bmp file in bytes
-      // fseek(inputFile, 0, SEEK_END);
-      // int bmpBytesCount = ftell(inputFile);
-      // fseek(inputFile, 0, SEEK_SET);
-
-      // create a copy of the bmp file
-      // char *bmpWithEncryptedDataBuffer;
-      // commented try to handle larger data than what we can handle in the 4th bytes
-      // if(sizeOfData>(bmpBytesCount-54)/4) {
-      //   printf("BIGGER");
-      //   bmpWithEncryptedDataBuffer = malloc(sizeof(char)*(bmpBytesCount+sizeOfData-(bmpBytesCount-54)/4));
-      // } else {
-        // bmpWithEncryptedDataBuffer = malloc(sizeof(char)*bmpBytesCount);
-      // }
       char *bmpWithEncryptedDataBuffer = malloc(sizeof(char)*bmpBytesCount);
       memcpy(bmpWithEncryptedDataBuffer, inputFile, bmpBytesCount);
 
@@ -263,8 +217,6 @@ void insertDataInBMPData(char *encryptedDataBuffer, char *bmpFileName, int sizeO
         bmpWithEncryptedDataBuffer[i] = headerBytes[i];
       }
 
-
-
       // set read cursor just after header
       fseek(inputFile, 54, SEEK_SET);
 
@@ -274,7 +226,6 @@ void insertDataInBMPData(char *encryptedDataBuffer, char *bmpFileName, int sizeO
             if((currentChar = fgetc(inputFile)) != EOF) {// test if we are at the end of file
               if(iterations==0) {
                 if(bytesCounter==3) {// reserved byte for encrypted bytes count (max 256)
-                  // printCharInBits(currentChar);
                   bmpWithEncryptedDataBuffer[iterations*4+bytesCounter+54] = (unsigned char)sizeOfData;
                 } else {
                   // add the current read byte to the buffer without changes
@@ -282,12 +233,10 @@ void insertDataInBMPData(char *encryptedDataBuffer, char *bmpFileName, int sizeO
                 }
               } else {
                 if(bytesCounter==3) {
-                  // printCharInBits(currentChar);
                   // insert data in the 4th byte
                   if(iterations<sizeOfData) {
                     bmpWithEncryptedDataBuffer[iterations*4+bytesCounter+54] = encryptedDataBuffer[iterations-1];
                   } else {
-                    // printf("CURRENTCHAR: %c\n", currentChar);
                     bmpWithEncryptedDataBuffer[iterations*4+bytesCounter+54] = currentChar;
                   }
                 } else {
@@ -297,7 +246,6 @@ void insertDataInBMPData(char *encryptedDataBuffer, char *bmpFileName, int sizeO
               }
 
             } else {// get out of the while loop
-              // bmpWithEncryptedDataBuffer[bmpBytesCount] = currentChar;
               notEndOfFile = 0;
               break;
             }
@@ -338,7 +286,6 @@ int getSizeOfHiddenFileInBMP(char *bmpFileName) {
 
 struct retrievedData retrieveDataInBMPData(char *bmpFileName) {
     int encryptedBytesSize = getSizeOfHiddenFileInBMP(bmpFileName);
-    printf("encryptedBytesSize %d\n", encryptedBytesSize);
     int sizeOfDecrypted;
     char *encryptedDataBuffer = malloc(sizeof(char)*encryptedBytesSize);
     // open the bmp file to read
@@ -402,15 +349,6 @@ struct retrievedData retrieveDataInBMPData(char *bmpFileName) {
       // }
 
     }
-    free(encryptedDataBuffer);
-    printf("writing");
-    FILE *fileWrite = fopen("ouloulou.txt", "wb");
-    if (fileWrite == NULL) {
-        printf("Error opening destination file!\n");
-        exit(1);
-    }
-    fwrite(encryptedDataBuffer, sizeof(char), sizeOfDecrypted, fileWrite);
-    fclose(fileWrite);
 
 
     struct retrievedData data;
@@ -434,47 +372,51 @@ int main() {
   char sourceFilePath[] = "test.txt";
   char *crypted = malloc(sizeof(char)*getFileNumberOfChars(sourceFilePath));
 
-  encryptAZ(sourceFilePath, crypted, key);
-  insertDataInBMPData(crypted, "test32b.bmp", getFileNumberOfChars(sourceFilePath));
-  struct retrievedData azeaze = retrieveDataInBMPData("test32bOutput.bmp");
-  decryptAZ(azeaze.data, azeaze.size, "DECRYPTEDTEXT.txt", key);
 
 
-  // char userInputFileName[256];
-  // char userOutputFileName[256];
-  // char userKey[] = "";
-  // char type;
-  //
-  // // user choose if he wants to encrypt, decrypt, or test the program
-  // while(type != 'e' && type != 'd' && type != 'a') {
-  //   printf("Do you want to encrypt (type e) or decrypt (type d) a file ? (type a to launch in automatic mode, for test purpose)\n");
-  //   scanf("%c", &type);
-  //   printf("\n");
-  // }
-  // if(type == 'a') {
-  //   // launch with test files
-  //   encrypt("test.txt", "testEncrypted.txt", "randomPass");
-  //   decrypt("testEncrypted.txt", "testDecrypted.txt", "randomPass");
-  //   encrypt("test.bmp", "testEncrypted.bmp", "randomPass");
-  //   decrypt("testEncrypted.bmp", "testDecrypted.bmp", "randomPass");
-  // } else {
-  //   // user give the name of the input file
-  //   printf("Enter the name of the file you want to %s (with the extension) :\n", type=='e'?"encrypt":"decrypt");
-  //   scanf("%s", userInputFileName);
-  //   // user give the name of the output file
-  //   printf("Enter the name of the file you want to generate (with the extension) :\n");
-  //   scanf("%s", userOutputFileName);
-  //   // user give the password
-  //   printf("Enter a password to %s your file :\n", type=='e'?"encrypt":"decrypt");
-  //   scanf("%s", userKey);
-  //   printf("\n");
-  //
-  //   if(type == 'e') {
-  //     encrypt(userInputFileName, userOutputFileName, userKey);
-  //   } else if(type == 'd') {
-  //     decrypt(userInputFileName, userOutputFileName, userKey);
-  //   }
-  // }
+
+  char userBMPFileName[256];
+  char userDataFileName[256];
+  char userKey[] = "";
+  char type;
+
+  // user choose if he wants to encrypt, decrypt, or test the program
+  while(type != 'h' && type != 'e') {
+    printf("Do you want to hide (type h) or extract (type e) a file ?\n");
+    scanf("%c", &type);
+    printf("\n");
+  }
+  if(type == 'h') {
+    // user give the name of the BMP file
+    printf("Enter the name of the BMP you want to use (with the extension) :\n");
+    scanf("%s", userBMPFileName);
+    // user give the name of the input file
+    printf("Enter the name of the file you want to hide (with the extension) :\n");
+    scanf("%s", userDataFileName);
+    // user give the password
+    printf("Enter a password :\n");
+    scanf("%s", userKey);
+    printf("\n");
+
+    encryptData(userDataFileName, crypted, userKey);
+    insertDataInBMPData(crypted, userBMPFileName, getFileNumberOfChars(userBMPFileName));
+
+  } else {
+    // user give the name of the BMP file
+    printf("Enter the name of the BMP you want to extract datas (with the extension) :\n");
+    scanf("%s", userBMPFileName);
+    // user give the name of the output file
+    printf("Enter the name of the output file (with the extension) :\n");
+    scanf("%s", userDataFileName);
+    // user give the password
+    printf("Enter a password :\n");
+    scanf("%s", userKey);
+    printf("\n");
+
+    struct retrievedData azeaze = retrieveDataInBMPData(userBMPFileName);
+    decryptData(azeaze.data, azeaze.size, userDataFileName, key);
+  }
+
 
   printf("\n##########################\n");
   printf("PROGRAM END\n");
