@@ -68,10 +68,8 @@ void encryptData(char *inputFileName, char *output, char *userKey) {
     int notEndOfFile = 1;
 
     while(notEndOfFile) {
-      printf("strlen(userKey) : %lu\n", strlen(userKey));
       // creating a buffer of bytes
       for(bufferCounter=0;bufferCounter<strlen(userKey);bufferCounter++) {
-        printf(".\n");
         // test if we are on the end of file
         if((currentChar = fgetc(inputFile)) != EOF) {
           // add the current read byte to the buffer
@@ -198,13 +196,12 @@ void decryptData(char *input, int inputSize, char *outputFileName, char *userKey
 
 
 
-void insertDataInBMPData(char *encryptedDataBuffer, char *bmpFileName, int sizeOfData) {
+void insertDataInBMPData(char *encryptedDataBuffer, char *bmpFileName) {
     int bmpBytesCount = getFileNumberOfChars(bmpFileName);
+    printf("bmpBytesCount %d\n", bmpBytesCount);
     char *bmpWithEncryptedDataBuffer = malloc(sizeof(char)*bmpBytesCount);
     // open the bmp file to read
-    printf("TETEZEARAEZRA\n");
     FILE *inputFile = fopen(bmpFileName, "rb");
-    printf("TETEZEARAEZRA\n");
     if(inputFile != NULL) {
 
       memcpy(bmpWithEncryptedDataBuffer, inputFile, bmpBytesCount);
@@ -232,7 +229,7 @@ void insertDataInBMPData(char *encryptedDataBuffer, char *bmpFileName, int sizeO
             if((currentChar = fgetc(inputFile)) != EOF) {// test if we are at the end of file
               if(iterations==0) {
                 if(bytesCounter==3) {// reserved byte for encrypted bytes count (max 256)
-                  bmpWithEncryptedDataBuffer[iterations*4+bytesCounter+54] = (unsigned char)sizeOfData;
+                  bmpWithEncryptedDataBuffer[iterations*4+bytesCounter+54] = (unsigned char)bmpBytesCount;
                 } else {
                   // add the current read byte to the buffer without changes
                   bmpWithEncryptedDataBuffer[iterations*4+bytesCounter+54] = currentChar;
@@ -240,7 +237,7 @@ void insertDataInBMPData(char *encryptedDataBuffer, char *bmpFileName, int sizeO
               } else {
                 if(bytesCounter==3) {
                   // insert data in the 4th byte
-                  if(iterations<sizeOfData) {
+                  if(iterations<bmpBytesCount) {
                     bmpWithEncryptedDataBuffer[iterations*4+bytesCounter+54] = encryptedDataBuffer[iterations-1];
                   } else {
                     bmpWithEncryptedDataBuffer[iterations*4+bytesCounter+54] = currentChar;
@@ -273,7 +270,7 @@ void insertDataInBMPData(char *encryptedDataBuffer, char *bmpFileName, int sizeO
       // }
 
     }
-    FILE *writeInputFile = fopen("test32bOutput.bmp", "wb");
+    FILE *writeInputFile = fopen(bmpFileName, "wb");
     if(writeInputFile != NULL) {
       fwrite(bmpWithEncryptedDataBuffer, sizeof(char), bmpBytesCount, writeInputFile);
     }
@@ -291,6 +288,7 @@ int getSizeOfHiddenFileInBMP(char *bmpFileName) {
 
 struct retrievedData retrieveDataInBMPData(char *bmpFileName) {
     int encryptedBytesSize = getSizeOfHiddenFileInBMP(bmpFileName);
+    printf("encryptedBytesSize : %d\n", encryptedBytesSize);
     int sizeOfDecrypted;
     char *encryptedDataBuffer = malloc(sizeof(char)*encryptedBytesSize);
     // open the bmp file to read
@@ -312,29 +310,29 @@ struct retrievedData retrieveDataInBMPData(char *bmpFileName) {
       int endOfFilePadding = 0;
 
       // set read cursor just after header
-      fseek(inputFile, 54, SEEK_SET);
+      fseek(inputFile, 58, SEEK_SET);
 
 
       while(notEndOfFile) {
         // creating a buffer of 4 bytes
         for(bytesCounter=0;bytesCounter<4;bytesCounter++) {
             if((currentChar = fgetc(inputFile)) != EOF) {// test if we are at the end of file
-              if(iterations!=0) {
+              // if(iterations!=0) {
                 if(bytesCounter==3) {
-                  // printCharInBits(currentChar);
                   // insert data in the 4th byte
                   if(iterations<encryptedBytesSize) {
-                    encryptedDataBuffer[iterations-1] = currentChar;
+                    printf("CURRENT RETRIEVED CHAR : %c\n", currentChar);
+                    encryptedDataBuffer[iterations] = currentChar;
                   } else {// get out of the while loop
-                    sizeOfDecrypted = iterations;
+                    sizeOfDecrypted = iterations+58+bytesCounter;
                     notEndOfFile = 0;
                     break;
                   }
                 }
-              }
+              // }
 
             } else {// get out of the while loop
-              sizeOfDecrypted = iterations+bytesCounter;
+              sizeOfDecrypted = iterations+54;
               notEndOfFile = 0;
               break;
             }
@@ -380,46 +378,47 @@ int main() {
 
   char userBMPFileName[256];
   char userDataFileName[256];
-  char userKey[] = "";
+  char userKey[256];
   char type;
 
   // user choose if he wants to encrypt, decrypt, or test the program
-  // while(type != 'h' && type != 'e') {
-  //   printf("Do you want to hide (type h) or extract (type e) a file ?\n");
-  //   scanf("%c", &type);
-  //   printf("\n");
-  // }
-  // if(type == 'h') {
-  //   // user give the name of the BMP file
-  //   printf("Enter the name of the BMP you want to use (with the extension) :\n");
-  //   scanf("%s", userBMPFileName);
-  //   // user give the name of the input file
-  //   printf("Enter the name of the file you want to hide (with the extension) :\n");
-  //   scanf("%s", userDataFileName);
-  //   // user give the password
+  while(type != 'h' && type != 'e') {
+    printf("Do you want to hide (type h) or extract (type e) a file ?\n");
+    scanf("%c", &type);
+    printf("\n");
+  }
+  if(type == 'h') {
+    // user give the name of the BMP file
+    printf("Enter the name of the BMP you want to use (with the extension) :\n");
+    scanf("%s", userBMPFileName);
+    // user give the name of the input file
+    printf("Enter the name of the file you want to hide (with the extension) :\n");
+    scanf("%s", userDataFileName);
+    // user give the password
     printf("Enter a password :\n");
     scanf("%s", userKey);
     printf("\n");
 
     char *crypted = malloc(sizeof(char)*getFileNumberOfChars("test.txt"));
-    encryptData("test.txt", crypted, userKey);
-    insertDataInBMPData(crypted, "test32bOutput.bmp", getFileNumberOfChars("test32bOutput.bmp"));
-  //
-  // } else {
-  //   // user give the name of the BMP file
-  //   printf("Enter the name of the BMP you want to extract datas (with the extension) :\n");
-  //   scanf("%s", userBMPFileName);
-  //   // user give the name of the output file
-  //   printf("Enter the name of the output file (with the extension) :\n");
-  //   scanf("%s", userDataFileName);
-  //   // user give the password
-  //   printf("Enter a password :\n");
-  //   scanf("%s", userKey);
-  //   printf("\n");
-  //
-  //   struct retrievedData azeaze = retrieveDataInBMPData(userBMPFileName);
-  //   decryptData(azeaze.data, azeaze.size, userDataFileName, userKey);
-  // }
+    encryptData(userDataFileName, crypted, userKey);
+    insertDataInBMPData(crypted, userBMPFileName);
+
+  } else {
+    // user give the name of the BMP file
+    printf("Enter the name of the BMP you want to extract datas (with the extension) :\n");
+    scanf("%s", userBMPFileName);
+    // user give the name of the output file
+    printf("Enter the name of the output file (with the extension) :\n");
+    scanf("%s", userDataFileName);
+    // user give the password
+    printf("Enter a password :\n");
+    scanf("%s", userKey);
+    printf("\n");
+
+    struct retrievedData dataFromBMP = retrieveDataInBMPData(userBMPFileName);
+    printf("dataFromBMP : %s | dataFromBMP size : %d\n", dataFromBMP.data, dataFromBMP.size);
+    decryptData(dataFromBMP.data, dataFromBMP.size, userDataFileName, userKey);
+  }
 
 
   printf("\n##########################\n");
