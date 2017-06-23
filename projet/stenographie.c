@@ -23,6 +23,20 @@ void printCharInBits(char input) {
    }
  }
 
+ int getFileNumberOfChars(char *filePath) {
+     FILE *source = fopen(filePath, "r");
+     if (source == NULL) {
+         printf("Error opening file!\n");
+         exit(1);
+     }
+
+     fseek(source, 0, SEEK_END);
+     int byteCount = ftell(source);
+     fclose(source);
+
+     return byteCount;
+ }
+
 
 
 // function used to encrypt an array of char with a key
@@ -308,13 +322,6 @@ void insertDataInBMPData(char *encryptedDataBuffer, char *bmpFileName, int sizeO
       FILE *writeInputFile = fopen("test32bOutput.bmp", "wb");
       if(writeInputFile != NULL) {
         fwrite(bmpWithEncryptedDataBuffer, sizeof(char), bmpBytesCount, writeInputFile);
-        // int j;
-        // for(j=0;j<bmpBytesCount;j++) {
-        //   printf("put char %c in 4th byte\n", bmpWithEncryptedDataBuffer[i]);
-        //   char currentChar[1];
-        //   memcpy(currentChar, &bmpWithEncryptedDataBuffer[i], 1);
-        //   fwrite(&currentChar, sizeof(char), 1, writeInputFile);
-        // }
       }
       fclose(writeInputFile);
     }
@@ -322,14 +329,11 @@ void insertDataInBMPData(char *encryptedDataBuffer, char *bmpFileName, int sizeO
 
 int getSizeOfHiddenFileInBMP(char *bmpFileName) {
   FILE *inputFile = fopen(bmpFileName, "rb");
-  // if(inputFile != NULL) {
     fseek(inputFile, 57, SEEK_SET);
     int size = fgetc(inputFile);
     int intSize = (unsigned int)size;
     fclose(inputFile);
     return (int)intSize;
-  // }
-  // return 0;
 }
 
 struct retrievedData retrieveDataInBMPData(char *bmpFileName) {
@@ -397,20 +401,8 @@ struct retrievedData retrieveDataInBMPData(char *bmpFileName) {
       //   }
       // }
 
-
-      // FILE *writeInputFile = fopen("TEXTOUTPUT.txt", "wb");
-      // if(writeInputFile != NULL) {
-      //   fwrite(encryptedDataBuffer, sizeof(char), encryptedBytesSize, writeInputFile);
-      //   // int j;
-      //   // for(j=0;j<bmpBytesCount;j++) {
-      //   //   printf("put char %c in 4th byte\n", bmpWithEncryptedDataBuffer[i]);
-      //   //   char currentChar[1];
-      //   //   memcpy(currentChar, bmpWithEncryptedDataBuffer[i], 1);
-      //   //   fwrite(currentChar, sizeof(char), 1, writeInputFile);
-      //   // }
-      // }
     }
-    // free(encryptedDataBuffer);
+    free(encryptedDataBuffer);
     printf("writing");
     FILE *fileWrite = fopen("ouloulou.txt", "wb");
     if (fileWrite == NULL) {
