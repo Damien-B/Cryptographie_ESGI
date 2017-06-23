@@ -21,391 +21,398 @@ void printCharInBits(char input) {
    }
  }
 
-/*
-    This methods crypts the buffer passed as parameter
-    with a xor on the last crypted block, then a xor on the key
-*/
-int xorBuffer(int length, char *destination, char *buffer, char *lastCryptedBlock, char *key, bool crypt) {
-    int i = 0;
+ /*
+     This methods crypts the buffer passed as parameter
+     with a xor on the last crypted block, then a xor on the key
+ */
+ int xorBuffer(int length, char *destination, char *buffer, char *lastCryptedBlock, char *key, bool crypt) {
+     int i = 0;
 
-    // for(i = 0; i < length; i ++) {
-    //     if(!crypt) {
-    //         destination[i] = (char)(buffer[i] ^ key[i]);
-    //     }
-    // }
+     // for(i = 0; i < length; i ++) {
+     //     if(!crypt) {
+     //         destination[i] = (char)(buffer[i] ^ key[i]);
+     //     }
+     // }
 
-    // printf(" After part 1 : %s\n", destination);
+     // printf(" After part 1 : %s\n", destination);
 
-    for(i = 0; i < length; i ++) {
-        // printf("i : %d", i);
-        /* CBC : Xor on last crypted block */
-        destination[i] = buffer[i] ^ lastCryptedBlock[i];
-    }
+     for(i = 0; i < length; i ++) {
+         /* CBC : Xor on last crypted block */
+         destination[i] = buffer[i] ^ lastCryptedBlock[i];
+     }
 
-    // for(i = 0; i < length; i ++) {
-    //     if(crypt) {
-    //         destination[i] = (char)(destination[i] ^ key[i]);
-    //     }
-    // }
-    return i;
+     // for(i = 0; i < length; i ++) {
+     //     if(crypt) {
+     //         destination[i] = (char)(destination[i] ^ key[i]);
+     //     }
+     // }
+     return i;
+ }
+
+ int getFileNumberOfChars(char *filePath) {
+     FILE *source = fopen(filePath, "r");
+     if (source == NULL) {
+         printf("Error opening file!\n");
+         exit(1);
+     }
+
+     fseek(source, 0, SEEK_END);
+     int byteCount = ftell(source);
+     fclose(source);
+
+     return byteCount;
+ }
+
+ int dechiffre(char *cryptedBuffer, int cryptedBufferLength, char *decryptedFilePath, char *key) {
+
+     /* Get key length */
+     int len = (sizeof(char) * strlen(key));
+
+     /* Open the destination file in write mode */
+     FILE *fileWrite = fopen(decryptedFilePath, "wb");
+     if (fileWrite == NULL) {
+         printf("Error opening destination file!\n");
+         exit(1);
+     }
+
+     /* Store the last crypted block in this
+         We initialize this with our key to have an IV */
+     char *lastXoredBlock = malloc(sizeof(char) * len);
+     if(lastXoredBlock == NULL) {
+         printf("Allocation Error !\n");
+         exit(1);
+     }
+     memcpy(lastXoredBlock, key, len);
+
+     /* The read buffer */
+     char *buffer = malloc(sizeof(char) * len);
+     if(buffer == NULL) {
+         printf("Allocation Error !\n");
+         exit(1);
+     }
+
+     /* The decrypted read buffer */
+     char *decryptedBuffer = malloc(sizeof(char) * len);
+     if(decryptedBuffer == NULL) {
+         printf("Allocation Error !\n");
+         exit(1);
+     }
+
+     /* set all entries in buffer to NULL by default*/
+     memset(buffer, 0, len);
+     memset(decryptedBuffer, 0, len);
+
+     int count = 0;
+     int i = 0;
+     int padding = cryptedBufferLength % len;
+     int paddingFrom = padding > 0 ? cryptedBufferLength - padding : cryptedBufferLength;
+
+     printf("Padding %d, from : %d", padding, paddingFrom);
+
+     for(i = 0; i <= cryptedBufferLength; i++) {
+         // printf("Buffer %d => %c \n", i, cryptedBuffer[i]);
+         printf (" i : %d // count : %d \n", i, count);
+         if(count < len) {
+             printf("Fill buffer with %c \n", cryptedBuffer[i]);
+             /* fill buffer */
+             buffer[count++] = cryptedBuffer[i];
+         }
+         if(count == len || (i > paddingFrom && count == padding)) {
+             printf("__________\n");
+             printf("decrypt buffer \n");
+             /* Buffer full, let's decrypt it */
+             int decryptedBytes = 0;
+             if(i < paddingFrom) {
+                 decryptedBytes = xorBuffer(len, decryptedBuffer, buffer, lastXoredBlock, key, false);
+             } else {
+                 printf(" IN PADDING \n");
+                 decryptedBytes = xorBuffer(padding, decryptedBuffer, buffer, lastXoredBlock, key, false);
+             }
+
+             // printf("Decrypted %d bytes : %s\n", decryptedBytes, decryptedBuffer);
+             memcpy(lastXoredBlock, buffer, len);
+             fwrite(decryptedBuffer, sizeof(char), decryptedBytes, fileWrite);
+
+             /* Reset for next buffer */
+             count = 0;
+             memset(buffer, 0, len);
+             memset(decryptedBuffer, 0, len);
+         }
+     }
+
+
+
+     free(buffer);
+     free(decryptedBuffer);
+     free(lastXoredBlock);
+     fclose(fileWrite);
+
+     return 0;
+ }
+
+ /*
+     This method crypts or decrypts (depending on "crypt" bool)
+     the source file and write the result in destination file
+     using the key parameter, in CBC mode
+ */
+ int chiffre(char *sourceFilePath, char *destFilePath, char *key, bool crypt) {
+
+     /* Open source file in read mode */
+     FILE *fileRead = fopen(sourceFilePath, "rb");
+     if (fileRead == NULL) {
+         perror("Error opening source file!\n");
+         exit(1);
+     }
+
+     int nbCharsInFile = getFileNumberOfChars(sourceFilePath);
+     char *cryptedBuffer = malloc(sizeof(char) * nbCharsInFile);
+     memset(cryptedBuffer, 0, nbCharsInFile);
+     int count = 0;
+
+     printf("Number of chars in file : %d \n", nbCharsInFile);
+
+     /* Get key length */
+     int len = (sizeof(char) * strlen(key));
+     printf("- Key length : %d \n", len);
+
+     /* Store the last crypted block in this
+         We initialize this with our key to have an IV */
+     char *lastXoredBlock = malloc(sizeof(char) * len);
+     if(lastXoredBlock == NULL) {
+         printf("Allocation Error !\n");
+         exit(1);
+     }
+     memcpy(lastXoredBlock, key, len);
+
+     /* The read buffer */
+     char *buffer = malloc(sizeof(char) * len);
+     size_t bytesRead = 0;
+
+     /* set all entries in buffer to NULL by default*/
+     memset(buffer, 0, len);
+
+     printf("- %s content ...  \n", crypt ? "Crypting" : "Decrypting");
+
+     char *crypted = malloc(sizeof(char) * len);
+     if(crypted == NULL) {
+         printf("Allocation Error !\n");
+         exit(1);
+     }
+
+     /* Read file using buffer */
+     while ((bytesRead = fread(buffer, sizeof(char), len, fileRead)) > 0)
+     {
+         int cryptedBytes = xorBuffer((int)bytesRead, crypted, buffer, lastXoredBlock, key, crypt);
+         //  printf(" decrypted : %s\n", decrypted);
+         // printf("Crypted => %s\n", crypted);
+
+         // strncat(cryptedBuffer, crypted, bytesRead);
+         printf("cryptedBufferContent %s \n", cryptedBuffer);
+         int i = 0;
+         for(i = 0; i < bytesRead; i++) {
+             /* We fill the globalBuffer with the crypted buffer */
+             cryptedBuffer[count++] = crypted[i];
+         }
+         // count+= bytesRead;
+
+         // Store last crypted block for next iteration
+         memcpy(lastXoredBlock, crypted, len);
+
+         memset(buffer, 0, bytesRead);
+         memset(crypted, 0, len);
+     }
+
+     /* Close our files */
+     fclose(fileRead);
+
+
+     // ---------------------TEST------------------------
+     // DONE Crypting buffer, let's decrypt it
+     dechiffre(cryptedBuffer, count, destFilePath, key);
+     // ------------------- ENDTEST ---------------------
+
+     // Finally we free our allocations
+     free(lastXoredBlock);
+     free(buffer);
+     free(crypted);
+     free(cryptedBuffer);
+
+     return 0;
+ }
+
+
+// function used to encrypt an array of char with a key
+void encryptDecryptWithXOR(char *input, char *output, char *keyToEncrypt, int length) {
+  int i;
+  for(i=0;i<length;i++) {
+    // do XOR with input and key for each byte
+    output[i] = input[i] ^ keyToEncrypt[i];
+  }
 }
 
-int getFileNumberOfChars(char *filePath) {
-    FILE *source = fopen(filePath, "r");
-    if (source == NULL) {
-        printf("Error opening file!\n");
-        exit(1);
-    }
+// function used to encrypt a file
+void encryptAZ(char *inputFileName, char *output, char *userKey) {
+  printf("• START ENCRYPTING\n");
+  // opening files
+  FILE *inputFile = fopen(inputFileName, "rb");
+  FILE *outputFile = fopen("ENCRYPTEDTEST.txt", "wb");
 
-    fseek(source, 0, SEEK_END);
-    int byteCount = ftell(source);
-    fclose(source);
+  if(inputFile != NULL) {
+    printf("• FILE LOADED (%s)\n", inputFileName);
 
-    return byteCount;
-}
+    int currentChar;
+    int bufferCounter;
+    int iterations = 0;
+    char *key = malloc(strlen(userKey));
+    strcpy(key, userKey);
+    char *currentBytes = malloc(strlen(userKey));
+    char *encryptedBytes = malloc(strlen(userKey));
+    char *previousDigestedBytes = malloc(strlen(userKey));
+    int endOfFilePadding = 0;
+    int notEndOfFile = 1;
 
-int dechiffre(char *cryptedBuffer, int cryptedBufferLength, char *decryptedFilePath, char *key) {
-
-    /* Get key length */
-    int len = (sizeof(char) * strlen(key));
-
-    /* Open the destination file in write mode */
-    FILE *fileWrite = fopen(decryptedFilePath, "wb");
-    if (fileWrite == NULL) {
-        printf("Error opening destination file!\n");
-        exit(1);
-    }
-
-    /* Store the last crypted block in this
-        We initialize this with our key to have an IV */
-    char *lastXoredBlock = malloc(sizeof(char) * len);
-    if(lastXoredBlock == NULL) {
-        printf("Allocation Error !\n");
-        exit(1);
-    }
-    memcpy(lastXoredBlock, key, len);
-
-    /* The read buffer */
-    char *buffer = malloc(sizeof(char) * len);
-    if(buffer == NULL) {
-        printf("Allocation Error !\n");
-        exit(1);
-    }
-
-    /* The decrypted read buffer */
-    char *decryptedBuffer = malloc(sizeof(char) * len);
-    if(decryptedBuffer == NULL) {
-        printf("Allocation Error !\n");
-        exit(1);
-    }
-
-    /* set all entries in buffer to NULL by default*/
-    memset(buffer, 0, len);
-    memset(decryptedBuffer, 0, len);
-
-    int count = 0;
-    int i = 0;
-    int padding = cryptedBufferLength % len;
-    int paddingFrom = padding > 0 ? cryptedBufferLength - padding : cryptedBufferLength;
-
-    // printf("Padding %d, from : %d", padding, paddingFrom);
-    memcpy(buffer, cryptedBuffer, len);
-    xorBuffer(len, decryptedBuffer, buffer, lastXoredBlock, key, false);
-    // printf("Decrypted bytes : %s\n", decryptedBuffer);
-
-    for(i = 0; i <= cryptedBufferLength; i++) {
-        // printf("Buffer %d => %c \n", i, cryptedBuffer[i]);
-        if(count < len - 1 && (i != cryptedBufferLength)) {
-            /* fill buffer */
-            buffer[count++] = cryptedBuffer[i];
-
-        } else {
-            printf("__________\n");
-
-            /* Buffer full, let's decrypt it */
-            int decryptedBytes = 0;
-            if(i != paddingFrom) {
-                decryptedBytes = xorBuffer(len, decryptedBuffer, buffer, lastXoredBlock, key, false);
-            } else {
-                decryptedBytes = xorBuffer(padding, decryptedBuffer, buffer, lastXoredBlock, key, false);
-            }
-
-            // printf("Decrypted %d bytes : %s\n", decryptedBytes, decryptedBuffer);
-            memcpy(lastXoredBlock, buffer, len);
-            fwrite(decryptedBuffer, sizeof(char), decryptedBytes, fileWrite);
-
-            /* Reset for next buffer */
-            count = 0;
-            memset(buffer, 0, len);
-            memset(decryptedBuffer, 0, len);
+    while(notEndOfFile) {
+      // creating a buffer of bytes
+      for(bufferCounter=0;bufferCounter<strlen(userKey);bufferCounter++) {
+        // test if we are on the end of file
+        if((currentChar = fgetc(inputFile)) != EOF) {
+          // add the current read byte to the buffer
+          currentBytes[bufferCounter] = currentChar;
+        } else {// get out of the while loop
+          notEndOfFile = 0;
+          // set the endOfFilePadding to use as the size of the key to encrypt with a XOR
+          endOfFilePadding = bufferCounter;
+          break;
         }
+      }
+      if(iterations == 0) {// first bytes
+        // first iteration : use the key as initialization vector
+        encryptDecryptWithXOR(currentBytes, encryptedBytes, key, strlen(userKey));
+        // doing a XOR with the key
+        encryptDecryptWithXOR(encryptedBytes, encryptedBytes, key, strlen(userKey));
+      } else if (endOfFilePadding == 0) {
+        // encrypt with the last result we got
+        encryptDecryptWithXOR(currentBytes, encryptedBytes, previousDigestedBytes, strlen(userKey));
+        // doing a XOR with the key
+        encryptDecryptWithXOR(encryptedBytes, encryptedBytes, key, strlen(userKey));
+      } else {// last bytes
+        // encrypt the end of the file (handling padding)
+        encryptDecryptWithXOR(currentBytes, encryptedBytes, previousDigestedBytes, endOfFilePadding);
+        // doing a XOR with the key
+        encryptDecryptWithXOR(encryptedBytes, encryptedBytes, key, endOfFilePadding);
+      }
+      // write the bytes in the output file
+      // fputs(encryptedBytes, outputFile);
+      if(endOfFilePadding != 0) {
+        fwrite(encryptedBytes, 1, endOfFilePadding, outputFile);
+        memcpy(output, encryptedBytes, endOfFilePadding);
+      } else {
+        fwrite(encryptedBytes, 1, strlen(userKey), outputFile);
+        memcpy(output, encryptedBytes, strlen(userKey));
+      }
+      // set previous encrypted bytes to use for the next iteration
+      memcpy(previousDigestedBytes, encryptedBytes, strlen(userKey));
+
+      iterations++;
     }
+    // free allocated memory (previous malloc)
+    free(key);
+    free(currentBytes);
+    free(encryptedBytes);
+    free(previousDigestedBytes);
+  }
 
+  // close the files
+  fclose(inputFile);
+  fclose(outputFile);
 
-
-    free(buffer);
-    free(decryptedBuffer);
-    free(lastXoredBlock);
-    fclose(fileWrite);
-
-    return 0;
-}
-
-/*
-    This method crypts or decrypts (depending on "crypt" bool)
-    the source file and write the result in destination file
-    using the key parameter, in CBC mode
-*/
-int chiffre(char *sourceFilePath, char *encryptedData, char *key, bool crypt) {
-
-    /* Open source file in read mode */
-    FILE *fileRead = fopen(sourceFilePath, "rb");
-    if (fileRead == NULL) {
-        printf("Error opening source file!\n");
-        exit(1);
-    }
-
-    int nbCharsInFile = getFileNumberOfChars(sourceFilePath);
-    char *cryptedBuffer = malloc(sizeof(char) * nbCharsInFile);
-    memset(cryptedBuffer, 0, nbCharsInFile);
-    int count = 0;
-
-    printf("Number of chars in file : %d \n", nbCharsInFile);
-
-    /* Get key length */
-    int len = (sizeof(char) * strlen(key));
-    printf("- Key length : %d \n", len);
-
-    /* Store the last crypted block in this
-        We initialize this with our key to have an IV */
-    char *lastXoredBlock = malloc(sizeof(char) * len);
-    if(lastXoredBlock == NULL) {
-        printf("Allocation Error !\n");
-        exit(1);
-    }
-    memcpy(lastXoredBlock, key, len);
-
-    /* The read buffer */
-    char *buffer = malloc(sizeof(char) * len);
-    size_t bytesRead = 0;
-
-    /* set all entries in buffer to NULL by default*/
-    memset(buffer, 0, len);
-
-    // printf("- %s content ...  \n", crypt ? "Crypting" : "Decrypting");
-
-    char *crypted = malloc(sizeof(char) * len);
-    if(crypted == NULL) {
-        printf("Allocation Error !\n");
-        exit(1);
-    }
-
-    /* Read file using buffer */
-    while ((bytesRead = fread(buffer, sizeof(char), len, fileRead)) > 0)
-    {
-        int cryptedBytes = xorBuffer((int)bytesRead, crypted, buffer, lastXoredBlock, key, crypt);
-        //  printf(" decrypted : %s\n", decrypted);
-        // printf("Crypted => %s\n", crypted);
-
-        strncat(cryptedBuffer, crypted, bytesRead);
-        // printf("cryptedBufferContent %s \n", cryptedBuffer);
-        // int i = 0;
-        // for(i = 0; i < bytesRead; i++) {
-        //     /* We fill the globalBuffer with the crypted buffer */
-        //     cryptedBuffer[count++] = crypted[i];
-        // }
-        count+= bytesRead;
-
-        // Store last crypted block for next iteration
-        memcpy(lastXoredBlock, crypted, len);
-
-        memset(buffer, 0, bytesRead);
-        memset(crypted, 0, len);
-    }
-
-    /* Close our files */
-    fclose(fileRead);
-
-
-    memcpy(encryptedData, cryptedBuffer, len);
-    // FILE *writeInputFile = fopen("DATAENCRYPTED.txt", "wb");
-    // if(writeInputFile != NULL) {
-    //   fwrite(encryptedData, sizeof(char), nbCharsInFile, writeInputFile);
-    // }
-
-    // ---------------------TEST------------------------
-    // DONE Crypting buffer, let's decrypt it
-    // dechiffre(cryptedBuffer, count, "POPOPO.txt", key);
-    // ------------------- ENDTEST ---------------------
-
-    // Finally we free our allocations
-    free(lastXoredBlock);
-    free(buffer);
-    free(crypted);
-    free(cryptedBuffer);
-
-    return 0;
+  printf("• ENCRYPTING FINISHED\n");
 }
 
 
-// // function used to encrypt an array of char with a key
-// void encryptDecryptWithXOR(char *input, char *output, char *keyToEncrypt, int length) {
-//   int i;
-//   for(i=0;i<length;i++) {
-//     // do XOR with input and key for each byte
-//     output[i] = input[i] ^ keyToEncrypt[i];
-//   }
-// }
-//
-// // function used to encrypt a file
-// void encrypt(char *input, char *output, char *userKey) {
-//   printf("• START ENCRYPTING\n");
-//
-//
-//     int currentChar;
-//     int bufferCounter;
-//     int iterations = 0;
-//     char *key = malloc(strlen(userKey));
-//     strcpy(key, userKey);
-//     char *currentBytes = malloc(strlen(userKey));
-//     char *encryptedBytes = malloc(strlen(userKey));
-//     char *previousDigestedBytes = malloc(strlen(userKey));
-//     int endOfFilePadding = 0;
-//     int notEndOfFile = 1;
-//
-//     while(notEndOfFile) {
-//       // creating a buffer of bytes
-//       for(bufferCounter=0;bufferCounter<strlen(userKey);bufferCounter++) {
-//         // test if we are on the end of file
-//         if((currentChar = fgetc(inputFile)) != EOF) {
-//           // add the current read byte to the buffer
-//           currentBytes[bufferCounter] = currentChar;
-//         } else {// get out of the while loop
-//           notEndOfFile = 0;
-//           // set the endOfFilePadding to use as the size of the key to encrypt with a XOR
-//           endOfFilePadding = bufferCounter;
-//           break;
-//         }
-//       }
-//       if(iterations == 0) {// first bytes
-//         // first iteration : use the key as initialization vector
-//         encryptDecryptWithXOR(currentBytes, encryptedBytes, key, strlen(userKey));
-//         // doing a XOR with the key
-//         encryptDecryptWithXOR(encryptedBytes, encryptedBytes, key, strlen(userKey));
-//       } else if (endOfFilePadding == 0) {
-//         // encrypt with the last result we got
-//         encryptDecryptWithXOR(currentBytes, encryptedBytes, previousDigestedBytes, strlen(userKey));
-//         // doing a XOR with the key
-//         encryptDecryptWithXOR(encryptedBytes, encryptedBytes, key, strlen(userKey));
-//       } else {// last bytes
-//         // encrypt the end of the file (handling padding)
-//         encryptDecryptWithXOR(currentBytes, encryptedBytes, previousDigestedBytes, endOfFilePadding);
-//         // doing a XOR with the key
-//         encryptDecryptWithXOR(encryptedBytes, encryptedBytes, key, endOfFilePadding);
-//       }
-//       // write the bytes in the output file
-//       if(endOfFilePadding != 0) {
-//         fwrite(encryptedBytes, 1, endOfFilePadding, outputFile);
-//       } else {
-//         fwrite(encryptedBytes, 1, strlen(userKey), outputFile);
-//       }
-//       // set previous encrypted bytes to use for the next iteration
-//       memcpy(previousDigestedBytes, encryptedBytes, strlen(userKey));
-//
-//       iterations++;
-//     }
-//     // free allocated memory (previous malloc)
-//     free(key);
-//     free(currentBytes);
-//     free(encryptedBytes);
-//     free(previousDigestedBytes);
-//   }
-//
-//   printf("• ENCRYPTING FINISHED\n");
-// }
-//
-// // function used to decrypt a file
-// void decrypt(char *inputFileName, char *outputFileName, char *userKey) {
-//   printf("• START DECRYPTING\n");
-//   // opening files
-//   FILE *inputFile = fopen(inputFileName, "rb");
-//   FILE *outputFile = fopen(outputFileName, "wb");
-//
-//   if(inputFile != NULL) {
-//     printf("• FILE LOADED (%s)\n", inputFileName);
-//
-//     int currentChar;
-//
-//     int bufferCounter;
-//     int iterations = 0;
-//     char *key = malloc(strlen(userKey));
-//     strcpy(key, userKey);
-//     char *currentBytes = malloc(strlen(userKey));
-//     char *decryptedBytes = malloc(strlen(userKey));
-//     char *previousBytes = malloc(strlen(userKey));
-//     int notEndOfFile = 1;
-//     int endOfFilePadding = 0;
-//
-//     while(notEndOfFile) {
-//       // creating a buffer of bytes
-//       for(bufferCounter=0;bufferCounter<strlen(userKey);bufferCounter++) {
-//         // test if we are on the end of file
-//         if((currentChar = fgetc(inputFile)) != EOF) {
-//           // add the current read byte to the buffer
-//           currentBytes[bufferCounter] = currentChar;
-//         } else {// get out of the while loop
-//           notEndOfFile = 0;
-//           // set the endOfFilePadding to use as the size of the key to decrypt with a XOR
-//           endOfFilePadding = bufferCounter;
-//           break;
-//         }
-//       }
-//       if(iterations == 0) {// first bytes
-//         // first iteration : use the key as initialization vector
-//         encryptDecryptWithXOR(currentBytes, decryptedBytes, key, strlen(userKey));
-//         // doing a XOR with the key
-//         encryptDecryptWithXOR(decryptedBytes, decryptedBytes, key, strlen(userKey));
-//       } else if (endOfFilePadding == 0) {
-//         // decrypt with the last encrypted bytes
-//         encryptDecryptWithXOR(currentBytes, decryptedBytes, key, strlen(userKey));
-//         // doing a XOR with the key
-//         encryptDecryptWithXOR(decryptedBytes, decryptedBytes, previousBytes, strlen(userKey));
-//       } else {// last bytes
-//         // decrypt the end of the file (handling padding)
-//         encryptDecryptWithXOR(currentBytes, decryptedBytes, key, endOfFilePadding);
-//         // doing a XOR with the key
-//         encryptDecryptWithXOR(decryptedBytes, decryptedBytes, previousBytes, endOfFilePadding);
-//       }
-//       // write the bytes in the output file
-//       if(endOfFilePadding != 0) {
-//         fwrite(decryptedBytes, 1, endOfFilePadding, outputFile);
-//       } else {
-//         fwrite(decryptedBytes, 1, strlen(userKey), outputFile);
-//       }
-//       // set previous bytes to use for the next iteration
-//       memcpy(previousBytes, currentBytes, strlen(userKey));
-//
-//       iterations++;
-//     }
-//     // free allocated memory (previous malloc)
-//     free(key);
-//     free(currentBytes);
-//     free(decryptedBytes);
-//     free(previousBytes);
-//   }
-//
-//   // close the files
-//   fclose(inputFile);
-//   fclose(outputFile);
-//
-//   printf("• DECRYPTING FINISHED\n");
-// }
+// function used to decrypt a file
+void decryptAZ(char *input, int inputSize, char *outputFileName, char *userKey) {
+  printf("• START DECRYPTING\n");
+  printf("DECRYPT INPUT SIZE : %d\n", inputSize);
+  // opening files
+  // FILE *inputFile = fopen(inputFileName, "rb");
+
+  FILE *outputFile = fopen(outputFileName, "wb");
+
+  // if(inputFile != NULL) {
+    // printf("• FILE LOADED (%s)\n", inputFileName);
+
+    int currentChar;
+
+    int bufferCounter;
+    int iterations = 0;
+    char *key = malloc(strlen(userKey));
+    strcpy(key, userKey);
+    char *currentBytes = malloc(strlen(userKey));
+    char *decryptedBytes = malloc(strlen(userKey));
+    char *previousBytes = malloc(strlen(userKey));
+    int notEndOfFile = 1;
+    int endOfFilePadding = 0;
+
+    while(notEndOfFile) {
+      // creating a buffer of bytes
+      for(bufferCounter=0;bufferCounter<strlen(userKey);bufferCounter++) {
+        // test if we are on the end of file
+        if(iterations*4+bufferCounter<inputSize) {
+          // add the current read byte to the buffer
+          currentBytes[bufferCounter] = input[iterations*4+bufferCounter];
+        } else {// get out of the while loop
+          notEndOfFile = 0;
+          // set the endOfFilePadding to use as the size of the key to decrypt with a XOR
+          endOfFilePadding = bufferCounter;
+          break;
+        }
+      }
+      if(iterations == 0) {// first bytes
+        // first iteration : use the key as initialization vector
+        encryptDecryptWithXOR(currentBytes, decryptedBytes, key, strlen(userKey));
+        // doing a XOR with the key
+        encryptDecryptWithXOR(decryptedBytes, decryptedBytes, key, strlen(userKey));
+      } else if (endOfFilePadding == 0) {
+        // decrypt with the last encrypted bytes
+        encryptDecryptWithXOR(currentBytes, decryptedBytes, key, strlen(userKey));
+        // doing a XOR with the key
+        encryptDecryptWithXOR(decryptedBytes, decryptedBytes, previousBytes, strlen(userKey));
+      } else {// last bytes
+        // decrypt the end of the file (handling padding)
+        encryptDecryptWithXOR(currentBytes, decryptedBytes, key, endOfFilePadding);
+        // doing a XOR with the key
+        encryptDecryptWithXOR(decryptedBytes, decryptedBytes, previousBytes, endOfFilePadding);
+      }
+      // write the bytes in the output file
+      if(endOfFilePadding != 0) {
+        fwrite(decryptedBytes, 1, endOfFilePadding-1, outputFile);
+      } else {
+        fwrite(decryptedBytes, 1, strlen(userKey), outputFile);
+      }
+      // set previous bytes to use for the next iteration
+      memcpy(previousBytes, currentBytes, strlen(userKey));
+
+      iterations++;
+    }
+    // free allocated memory (previous malloc)
+    free(key);
+    free(currentBytes);
+    free(decryptedBytes);
+    free(previousBytes);
+  // }
+
+  // close the files
+  // fclose(inputFile);
+  fclose(outputFile);
+
+  printf("• DECRYPTING FINISHED\n");
+}
 
 
 
 void insertDataInBMPData(char *encryptedDataBuffer, char *bmpFileName, int sizeOfData) {
     int bmpBytesCount = getFileNumberOfChars(bmpFileName);
-
     // open the bmp file to read
     FILE *inputFile = fopen(bmpFileName, "rb");
     if(inputFile != NULL) {
@@ -425,7 +432,6 @@ void insertDataInBMPData(char *encryptedDataBuffer, char *bmpFileName, int sizeO
         // bmpWithEncryptedDataBuffer = malloc(sizeof(char)*bmpBytesCount);
       // }
       char *bmpWithEncryptedDataBuffer = malloc(sizeof(char)*bmpBytesCount);
-
       memcpy(bmpWithEncryptedDataBuffer, inputFile, bmpBytesCount);
 
       int currentChar;
@@ -464,7 +470,7 @@ void insertDataInBMPData(char *encryptedDataBuffer, char *bmpFileName, int sizeO
                   // printCharInBits(currentChar);
                   // insert data in the 4th byte
                   if(iterations<sizeOfData) {
-                    bmpWithEncryptedDataBuffer[iterations*4+bytesCounter+54] = encryptedDataBuffer[iterations];
+                    bmpWithEncryptedDataBuffer[iterations*4+bytesCounter+54] = encryptedDataBuffer[iterations-1];
                   } else {
                     // printf("CURRENTCHAR: %c\n", currentChar);
                     bmpWithEncryptedDataBuffer[iterations*4+bytesCounter+54] = currentChar;
@@ -515,14 +521,14 @@ void insertDataInBMPData(char *encryptedDataBuffer, char *bmpFileName, int sizeO
 
 int getSizeOfHiddenFileInBMP(char *bmpFileName) {
   FILE *inputFile = fopen(bmpFileName, "rb");
-  if(inputFile != NULL) {
+  // if(inputFile != NULL) {
     fseek(inputFile, 57, SEEK_SET);
     int size = fgetc(inputFile);
     int intSize = (unsigned int)size;
     fclose(inputFile);
     return (int)intSize;
-  }
-  return 0;
+  // }
+  // return 0;
 }
 
 struct retrievedData retrieveDataInBMPData(char *bmpFileName) {
@@ -603,10 +609,11 @@ struct retrievedData retrieveDataInBMPData(char *bmpFileName) {
       // }
     }
     // free(encryptedDataBuffer);
-    printf("SIZE1 : %d\n", sizeOfDecrypted);
+
     struct retrievedData data;
     data.size = sizeOfDecrypted;
     data.data = encryptedDataBuffer;
+    free(encryptedDataBuffer);
     return data;
 }
 
@@ -621,16 +628,24 @@ int main() {
   char test[50] = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
 
   bool crypt = true;
+  // char key[] = "password";
   char *key = "password";
   char sourceFilePath[] = "test.txt";
   char *crypted = malloc(sizeof(char)*getFileNumberOfChars(sourceFilePath));
+  // encryptAZ(sourceFilePath, crypted, key);
   chiffre(sourceFilePath, crypted, key, crypt);
+  printf("CRYPTED :%s\n", crypted);
 
   insertDataInBMPData(crypted, "test32b.bmp", getFileNumberOfChars(sourceFilePath));
 
   struct retrievedData azeaze = retrieveDataInBMPData("test32bOutput.bmp");
-  printf("SIZE : %d\n", azeaze.size);
-  dechiffre(azeaze.data, azeaze.size, "DECRYPTEDTEXT.txt", key);
+
+    printf("AZZAEZAEAZEZAE : %d\n", azeaze.size);
+      printf("AZZAEZAEAZEZAE : %s\n", azeaze.data);
+  // decryptAZ(azeaze.data, azeaze.size, "DECRYPTEDTEXT.txt", key);
+  dechiffre(azeaze.data, azeaze.size, "azeaze.txt", key);
+
+
   // char userInputFileName[256];
   // char userOutputFileName[256];
   // char userKey[] = "";
